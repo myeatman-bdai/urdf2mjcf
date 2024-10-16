@@ -14,6 +14,9 @@
 [![python](https://img.shields.io/badge/-Python_3.11-blue?logo=python&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![black](https://img.shields.io/badge/Code%20Style-Black-black.svg?labelColor=gray)](https://black.readthedocs.io/en/stable/)
 [![ruff](https://img.shields.io/badge/Linter-Ruff-red.svg?labelColor=gray)](https://github.com/charliermarsh/ruff)
+<br />
+[![Python Checks](https://github.com/kscalelabs/urdf2mjcf/actions/workflows/test.yml/badge.svg)](https://github.com/kscalelabs/urdf2mjcf/actions/workflows/test.yml)
+[![Publish Python Package](https://github.com/kscalelabs/urdf2mjcf/actions/workflows/publish.yml/badge.svg)](https://github.com/kscalelabs/urdf2mjcf/actions/workflows/publish.yml)
 
 </div>
 
