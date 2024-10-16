@@ -144,7 +144,7 @@ def add_assets(root: ET.Element) -> None:
 
 def get_max_foot_distance(root: ET.Element) -> float:
     def recursive_search(element: ET.Element, current_z: float = 0) -> float:
-        max_distance = 0
+        max_distance = 0.0
         for child in element:
             if child.tag == "body":
                 body_pos = child.get("pos")
@@ -160,7 +160,10 @@ def get_max_foot_distance(root: ET.Element) -> float:
                     max_distance = max(max_distance, -(current_z + geom_z))
         return max_distance
 
-    return recursive_search(root.find("worldbody"))
+    worldbody = root.find("worldbody")
+    if worldbody is None:
+        return 0.0
+    return recursive_search(worldbody)
 
 
 def add_root_body(root: ET.Element) -> None:
@@ -273,8 +276,9 @@ def add_actuators(root: ET.Element) -> None:
             continue
 
         # Get joint limits if present
-        lower_limit = joint.find("limit").get("lower") if joint.find("limit") is not None else None
-        upper_limit = joint.find("limit").get("upper") if joint.find("limit") is not None else None
+        limit_element = joint.find("limit")
+        lower_limit = limit_element.get("lower") if limit_element is not None else None
+        upper_limit = limit_element.get("upper") if limit_element is not None else None
 
         if lower_limit is not None and upper_limit is not None:
             ctrlrange = f"{lower_limit} {upper_limit}"
@@ -343,8 +347,6 @@ def add_sensors(root: ET.Element) -> None:
             )
 
     # Add additional sensors
-    # For example, framequat and gyro sensors
-    # For this, we need to have a site named "imu"
     imu_site = None
     for site in root.iter("site"):
         if site.attrib.get("name") == "imu":
@@ -424,9 +426,9 @@ def convert_urdf_to_mjcf(
 
         urdf_tree = ET.parse(temp_urdf_path)
         for mesh in urdf_tree.iter("mesh"):
-            if (full_filename := mesh.attrib.get("filename")) is not None:
-                continue
-            mesh.attrib["filename"] = Path(full_filename).name
+            full_filename = mesh.attrib.get("filename")
+            if full_filename is not None:
+                mesh.attrib["filename"] = Path(full_filename).name
 
         # Load the URDF file with Mujoco and save it as an MJCF file in the temp directory
         temp_mjcf_path = temp_dir_path / mjcf_path.name
