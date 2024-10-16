@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Union
 
 import mujoco
 
@@ -416,8 +417,8 @@ def add_cameras(root: ET.Element, distance: float = 3.0, height_offset: float = 
 
 
 def convert_urdf_to_mjcf(
-    urdf_path: str | Path,
-    mjcf_path: str | Path | None = None,
+    urdf_path: Union[str, Path],
+    mjcf_path: Union[str, Path, None] = None,
     no_collision_mesh: bool = False,
     copy_meshes: bool = False,
     camera_distance: float = 3.0,
