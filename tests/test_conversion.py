@@ -12,7 +12,12 @@ from urdf2mjcf.convert import convert_urdf_to_mjcf
 def test_conversion(tmpdir: Path) -> None:
     urdf_path = Path(__file__).parent / "sample" / "robot.urdf"
     mjcf_path = tmpdir / "robot.mjcf"
-    convert_urdf_to_mjcf(urdf_path, mjcf_path)
+    convert_urdf_to_mjcf(
+        urdf_path=urdf_path,
+        mjcf_path=mjcf_path,
+        # copy_meshes=True,
+        copy_meshes=False,
+    )
     assert mjcf_path.exists()
 
 

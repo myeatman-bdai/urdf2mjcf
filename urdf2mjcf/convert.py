@@ -1,6 +1,7 @@
 """Uses Mujoco to convert from URDF to MJCF files."""
 
 import argparse
+import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -117,7 +118,7 @@ def add_assets(root: ET.Element) -> None:
             "rgb1": ".0 .0 .0",
             "rgb2": ".8 .8 .8",
             "width": "100",
-            "height": "108",
+            "height": "100",
         },
     )
     ET.SubElement(
@@ -140,58 +141,25 @@ def add_assets(root: ET.Element) -> None:
         },
     )
 
+def get_max_foot_distance(root: ET.Element) -> float:
+    def recursive_search(element: ET.Element, current_z: float = 0) -> float:
+        max_distance = 0
+        for child in element:
+            if child.tag == 'body':
+                body_pos = child.get('pos')
+                if body_pos:
+                    body_z = float(body_pos.split()[2])
+                else:
+                    body_z = 0
+                max_distance = max(max_distance, recursive_search(child, current_z + body_z))
+            elif child.tag == 'geom':
+                geom_pos = child.get('pos')
+                if geom_pos:
+                    geom_z = float(geom_pos.split()[2])
+                    max_distance = max(max_distance, -(current_z + geom_z))
+        return max_distance
 
-def add_worldbody_elements(root: ET.Element) -> None:
-    worldbody = root.find("worldbody")
-    if worldbody is None:
-        worldbody = ET.SubElement(root, "worldbody")
-
-    # Add ground plane
-    worldbody.insert(
-        0,
-        ET.Element(
-            "geom",
-            attrib={
-                "name": "ground",
-                "type": "plane",
-                "pos": "0.001 0 0",
-                "quat": "1 0 0 0",
-                "material": "matplane",
-                "condim": "1",
-                "conaffinity": "15",
-                "size": "0 0 1",
-            },
-        ),
-    )
-
-    # Add lights
-    worldbody.insert(
-        0,
-        ET.Element(
-            "light",
-            attrib={
-                "directional": "true",
-                "diffuse": "0.6 0.6 0.6",
-                "specular": "0.2 0.2 0.2",
-                "pos": "0 0 4",
-                "dir": "0 0 -1",
-            },
-        ),
-    )
-    worldbody.insert(
-        0,
-        ET.Element(
-            "light",
-            attrib={
-                "directional": "true",
-                "diffuse": "0.4 0.4 0.4",
-                "specular": "0.1 0.1 0.1",
-                "pos": "0 0 5.0",
-                "dir": "0 0 -1",
-                "castshadow": "false",
-            },
-        ),
-    )
+    return recursive_search(root.find('worldbody'))
 
 
 def add_root_body(root: ET.Element) -> None:
@@ -199,13 +167,18 @@ def add_root_body(root: ET.Element) -> None:
     if worldbody is None:
         worldbody = ET.SubElement(root, "worldbody")
 
+    # Calculate the initial height
+    foot_distance = get_max_foot_distance(root)
+    epsilon = 0.01
+    initial_height = foot_distance + epsilon
+
     # Create a root body
     root_body = ET.Element(
         "body",
         attrib={
             "name": "root",
-            "pos": "0 0 0",
-            "quat": "0.0 0.0 0 1",
+            "pos": f"0 0 {initial_height}",  # Set the initial height
+            "quat": "1 0 0 0",
         },
     )
 
@@ -258,6 +231,59 @@ def add_root_body(root: ET.Element) -> None:
     worldbody.append(root_body)
 
 
+def add_worldbody_elements(root: ET.Element) -> None:
+    worldbody = root.find("worldbody")
+    if worldbody is None:
+        worldbody = ET.SubElement(root, "worldbody")
+
+    # Add ground plane
+    worldbody.insert(
+        0,
+        ET.Element(
+            "geom",
+            attrib={
+                "name": "ground",
+                "type": "plane",
+                "pos": "0 0 0",  # Changed to "0 0 0"
+                "size": "100 100 0.001",
+                "quat": "1 0 0 0",
+                "material": "matplane",
+                "condim": "3",
+                "conaffinity": "15",
+            },
+        ),
+    )
+
+    # Add lights
+    worldbody.insert(
+        0,
+        ET.Element(
+            "light",
+            attrib={
+                "directional": "true",
+                "diffuse": "0.6 0.6 0.6",
+                "specular": "0.2 0.2 0.2",
+                "pos": "0 0 4",
+                "dir": "0 0 -1",
+            },
+        ),
+    )
+    worldbody.insert(
+        0,
+        ET.Element(
+            "light",
+            attrib={
+                "directional": "true",
+                "diffuse": "0.4 0.4 0.4",
+                "specular": "0.1 0.1 0.1",
+                "pos": "0 0 5.0",
+                "dir": "0 0 -1",
+                "castshadow": "false",
+            },
+        ),
+    )
+
+
 def add_actuators(root: ET.Element) -> None:
     actuator_element = ET.Element("actuator")
 
@@ -266,12 +292,17 @@ def add_actuators(root: ET.Element) -> None:
         joint_name = joint.attrib.get("name")
         if joint_name is None:
             continue
-        # Get actuatorfrcrange if present
-        actuatorfrcrange = joint.attrib.get("actuatorfrcrange")
-        if actuatorfrcrange is not None:
-            ctrlrange = actuatorfrcrange
+
+        # Get joint limits if present
+        lower_limit = joint.find("limit").get("lower") if joint.find("limit") is not None else None
+        upper_limit = joint.find("limit").get("upper") if joint.find("limit") is not None else None
+
+        if lower_limit is not None and upper_limit is not None:
+            ctrlrange = f"{lower_limit} {upper_limit}"
         else:
-            ctrlrange = "-1000.0 1000.0"
+            # Fallback to actuatorfrcrange if present, otherwise use a default range
+            actuatorfrcrange = joint.attrib.get("actuatorfrcrange")
+            ctrlrange = actuatorfrcrange if actuatorfrcrange is not None else "-1.0 1.0"
 
         ET.SubElement(
             actuator_element,
@@ -371,29 +402,11 @@ def add_sensors(root: ET.Element) -> None:
     root.append(sensor_element)
 
 
-def add_keyframes(root: ET.Element) -> None:
-    keyframe_element = ET.Element("keyframe")
-
-    # If you have specific keyframe data, you can add it here.
-    # For now, we'll use a placeholder.
-    ET.SubElement(
-        keyframe_element,
-        "key",
-        attrib={
-            "name": "default",
-            "qpos": "0 0 0.63 1 0.0 0.0 0 -0.157 0.0394 0.0628 0.441 -0.258 -0.22 0.026 0.0314 0.441 -0.223",
-        },
-    )
-
-    if isinstance(existing_element := root.find("keyframe"), ET.Element):
-        root.remove(existing_element)
-    root.append(keyframe_element)
-
-
 def convert_urdf_to_mjcf(
     urdf_path: str | Path,
     mjcf_path: str | Path | None = None,
     no_collision_mesh: bool = False,
+    copy_meshes: bool = False,
 ) -> None:
     """Convert a URDF file to an MJCF file.
 
@@ -402,6 +415,7 @@ def convert_urdf_to_mjcf(
         mjcf_path: The path to the MJCF file. If not provided, use the URDF
             path with the extension replaced with ".mjcf".
         no_collision_mesh: Do not include collision meshes.
+        copy_meshes: Copy mesh files to the output MJCF directory if different from URDF directory.
     """
     urdf_path = Path(urdf_path)
     mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".mjcf")
@@ -416,13 +430,15 @@ def convert_urdf_to_mjcf(
         temp_urdf_path = temp_dir_path / urdf_path.name
         temp_urdf_path.symlink_to(urdf_path)
 
-        # Copy mesh files to temp directory
+        # Copy mesh files to temp directory and potentially to output directory
+        mesh_files = []
         for (_, visual_mesh_path), (_, collision_mesh_path) in iter_meshes(urdf_path):
             for mesh_path in list({visual_mesh_path, collision_mesh_path}):
                 if mesh_path is not None:
                     temp_mesh_path = temp_dir_path / mesh_path.name
                     try:
                         temp_mesh_path.symlink_to(mesh_path)
+                        mesh_files.append(mesh_path)
                     except FileExistsError:
                         pass
 
@@ -456,7 +472,13 @@ def convert_urdf_to_mjcf(
         add_worldbody_elements(root)
         add_actuators(root)
         add_sensors(root)
-        # add_keyframes(root)
+
+        # Copy mesh files to output directory if requested
+        if copy_meshes and mjcf_path.parent != urdf_path.parent:
+            mesh_dir = mjcf_path.parent / "meshes"
+            mesh_dir.mkdir(exist_ok=True)
+            for mesh_file in mesh_files:
+                shutil.copy2(mesh_file, mesh_dir / mesh_file.name)
 
         # Write the updated MJCF file to the original destination
         save_xml(mjcf_path, mjcf_tree)
@@ -467,12 +489,14 @@ def cli() -> None:
     parser.add_argument("urdf_path", type=str, help="The path to the URDF file.")
     parser.add_argument("--no-collision-mesh", action="store_true", help="Do not include collision meshes.")
     parser.add_argument("--output", type=str, help="The path to the output MJCF file.")
+    parser.add_argument("--copy-meshes", action="store_true", help="Copy mesh files to the output MJCF directory.")
     args = parser.parse_args()
 
     convert_urdf_to_mjcf(
         urdf_path=args.urdf_path,
         mjcf_path=args.output,
         no_collision_mesh=args.no_collision_mesh,
+        copy_meshes=args.copy_meshes,
     )
 
 
