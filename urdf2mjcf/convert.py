@@ -383,11 +383,45 @@ def add_sensors(root: ET.Element) -> None:
     root.append(sensor_element)
 
 
+def add_cameras(root: ET.Element, distance: float = 3.0, height_offset: float = 0.5) -> None:
+    worldbody = root.find("worldbody")
+    if worldbody is None:
+        return
+
+    foot_distance = get_max_foot_distance(root)
+    camera_height = foot_distance + height_offset
+
+    # Add a fixed camera
+    ET.SubElement(
+        worldbody,
+        "camera",
+        attrib={
+            "name": "fixed",
+            "pos": f"0 {-distance} {camera_height}",
+            "xyaxes": "1 0 0 0 0 1",
+        },
+    )
+
+    # Add a tracking camera
+    ET.SubElement(
+        worldbody,
+        "camera",
+        attrib={
+            "name": "track",
+            "mode": "trackcom",
+            "pos": f"0 {-distance} {camera_height}",
+            "xyaxes": "1 0 0 0 0 1",
+        },
+    )
+
+
 def convert_urdf_to_mjcf(
     urdf_path: str | Path,
     mjcf_path: str | Path | None = None,
     no_collision_mesh: bool = False,
     copy_meshes: bool = False,
+    camera_distance: float = 3.0,
+    camera_height_offset: float = 0.5,
 ) -> None:
     """Convert a URDF file to an MJCF file.
 
@@ -396,7 +430,10 @@ def convert_urdf_to_mjcf(
         mjcf_path: The path to the MJCF file. If not provided, use the URDF
             path with the extension replaced with ".mjcf".
         no_collision_mesh: Do not include collision meshes.
-        copy_meshes: Copy mesh files to the output MJCF directory if different from URDF directory.
+        copy_meshes: Copy mesh files to the output MJCF directory if different
+            from URDF directory.
+        camera_distance: Distance of the fixed camera from the robot.
+        camera_height_offset: Height offset of the fixed camera from the robot.
     """
     urdf_path = Path(urdf_path)
     mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".mjcf")
@@ -456,6 +493,11 @@ def convert_urdf_to_mjcf(
         add_compiler(root)
         add_option(root)
         add_assets(root)
+        add_cameras(
+            root,
+            distance=camera_distance,
+            height_offset=camera_height_offset,
+        )
         add_root_body(root)
         add_worldbody_elements(root)
         add_actuators(root)
@@ -480,6 +522,8 @@ def main() -> None:
     parser.add_argument("--no-collision-mesh", action="store_true", help="Do not include collision meshes.")
     parser.add_argument("--output", type=str, help="The path to the output MJCF file.")
     parser.add_argument("--copy-meshes", action="store_true", help="Copy mesh files to the output MJCF directory.")
+    parser.add_argument("--camera-distance", type=float, default=3.0, help="Camera distance from the robot.")
+    parser.add_argument("--camera-height-offset", type=float, default=0.5, help="Camera height offset.")
     args = parser.parse_args()
 
     convert_urdf_to_mjcf(
@@ -487,6 +531,8 @@ def main() -> None:
         mjcf_path=args.output,
         no_collision_mesh=args.no_collision_mesh,
         copy_meshes=args.copy_meshes,
+        camera_distance=args.camera_distance,
+        camera_height_offset=args.camera_height_offset,
     )
 
 
