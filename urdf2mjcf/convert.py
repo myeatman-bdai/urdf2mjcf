@@ -141,25 +141,26 @@ def add_assets(root: ET.Element) -> None:
         },
     )
 
+
 def get_max_foot_distance(root: ET.Element) -> float:
     def recursive_search(element: ET.Element, current_z: float = 0) -> float:
         max_distance = 0
         for child in element:
-            if child.tag == 'body':
-                body_pos = child.get('pos')
+            if child.tag == "body":
+                body_pos = child.get("pos")
                 if body_pos:
                     body_z = float(body_pos.split()[2])
                 else:
                     body_z = 0
                 max_distance = max(max_distance, recursive_search(child, current_z + body_z))
-            elif child.tag == 'geom':
-                geom_pos = child.get('pos')
+            elif child.tag == "geom":
+                geom_pos = child.get("pos")
                 if geom_pos:
                     geom_z = float(geom_pos.split()[2])
                     max_distance = max(max_distance, -(current_z + geom_z))
         return max_distance
 
-    return recursive_search(root.find('worldbody'))
+    return recursive_search(root.find("worldbody"))
 
 
 def add_root_body(root: ET.Element) -> None:
@@ -187,28 +188,6 @@ def add_root_body(root: ET.Element) -> None:
         root_body,
         "freejoint",
         attrib={"name": "root"},
-    )
-
-    # Add cameras
-    ET.SubElement(
-        root_body,
-        "camera",
-        attrib={
-            "name": "front",
-            "pos": "0 -3 1",
-            "xyaxes": "1 0 0 0 1 2",
-            "mode": "trackcom",
-        },
-    )
-    ET.SubElement(
-        root_body,
-        "camera",
-        attrib={
-            "name": "side",
-            "pos": "-2.893 -1.330 0.757",
-            "xyaxes": "0.405 -0.914 0.000 0.419 0.186 0.889",
-            "mode": "trackcom",
-        },
     )
 
     # Add imu site
@@ -427,8 +406,9 @@ def convert_urdf_to_mjcf(
         temp_dir_path = Path(temp_dir)
 
         # Copy URDF file to temp directory
+        urdf_dir = urdf_path.parent.resolve()
         temp_urdf_path = temp_dir_path / urdf_path.name
-        temp_urdf_path.symlink_to(urdf_path)
+        temp_urdf_path.write_bytes(urdf_path.read_bytes())
 
         # Copy mesh files to temp directory and potentially to output directory
         mesh_files = []
@@ -438,9 +418,15 @@ def convert_urdf_to_mjcf(
                     temp_mesh_path = temp_dir_path / mesh_path.name
                     try:
                         temp_mesh_path.symlink_to(mesh_path)
-                        mesh_files.append(mesh_path)
+                        mesh_files.append(mesh_path.relative_to(urdf_dir))
                     except FileExistsError:
                         pass
+
+        urdf_tree = ET.parse(temp_urdf_path)
+        for mesh in urdf_tree.iter("mesh"):
+            if (full_filename := mesh.attrib.get("filename")) is not None:
+                continue
+            mesh.attrib["filename"] = Path(full_filename).name
 
         # Load the URDF file with Mujoco and save it as an MJCF file in the temp directory
         temp_mjcf_path = temp_dir_path / mjcf_path.name
@@ -473,18 +459,20 @@ def convert_urdf_to_mjcf(
         add_actuators(root)
         add_sensors(root)
 
-        # Copy mesh files to output directory if requested
-        if copy_meshes and mjcf_path.parent != urdf_path.parent:
-            mesh_dir = mjcf_path.parent / "meshes"
-            mesh_dir.mkdir(exist_ok=True)
+        # Copy mesh files to the output directory.
+        if copy_meshes:
             for mesh_file in mesh_files:
-                shutil.copy2(mesh_file, mesh_dir / mesh_file.name)
+                mjcf_mesh_path = mjcf_path.parent.resolve() / mesh_file
+                mjcf_mesh_path.parent.mkdir(parents=True, exist_ok=True)
+                urdf_mesh_path = urdf_dir / mesh_file
+                if mjcf_mesh_path != urdf_mesh_path:
+                    shutil.copy2(urdf_mesh_path, mjcf_mesh_path)
 
         # Write the updated MJCF file to the original destination
         save_xml(mjcf_path, mjcf_tree)
 
 
-def cli() -> None:
+def main() -> None:
     parser = argparse.ArgumentParser(description="Convert a URDF file to an MJCF file.")
     parser.add_argument("urdf_path", type=str, help="The path to the URDF file.")
     parser.add_argument("--no-collision-mesh", action="store_true", help="Do not include collision meshes.")
@@ -501,4 +489,4 @@ def cli() -> None:
 
 
 if __name__ == "__main__":
-    cli()
+    main()

@@ -37,4 +37,9 @@ setup(
     tests_require=requirements_dev,
     extras_require={"dev": requirements_dev},
     packages=["urdf2mjcf"],
+    entry_points={
+        "console_scripts": [
+            "urdf2mjcf=urdf2mjcf.convert:main",
+        ],
+    },
 )

@@ -54,6 +54,13 @@ def save_xml(path: str | Path | io.StringIO, tree: ET.ElementTree | ET.Element) 
         tree = tree.getroot()
     xmlstr = minidom.parseString(ET.tostring(tree)).toprettyxml(indent="  ")
     xmlstr = re.sub(r"\n\s*\n", "\n", xmlstr)
+
+    # Add newlines between second-level nodes
+    root = ET.fromstring(xmlstr)
+    for child in root[:-1]:
+        child.tail = "\n\n  "
+    xmlstr = ET.tostring(root, encoding="unicode")
+
     if isinstance(path, io.StringIO):
         path.write(xmlstr)
     else:
