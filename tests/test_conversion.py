@@ -13,8 +13,6 @@ def test_conversion(tmpdir: Path) -> None:
     urdf_path = Path(__file__).parent / "sample" / "robot.urdf"
     mjcf_path = tmpdir / "robot.mjcf"
     convert_urdf_to_mjcf(urdf_path, mjcf_path)
-    with open(mjcf_path, "r") as f:
-        print(f.read())
     assert mjcf_path.exists()
 
 
