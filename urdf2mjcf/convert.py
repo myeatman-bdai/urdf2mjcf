@@ -11,53 +11,6 @@ import mujoco
 from urdf2mjcf.utils import iter_meshes, save_xml
 
 
-def add_visual_geom_logic(root):
-    # add visual geom logic
-    for body in root.findall(".//body"):
-        original_geoms = list(body.findall("geom"))
-        for geom in original_geoms:
-            geom.set("class", "visualgeom")
-            # Create a new geom element
-            new_geom = ET.Element("geom")
-            new_geom.set("type", geom.get("type") or "")  # Ensure type is not None
-            new_geom.set("rgba", geom.get("rgba") or "1 0.5 0.75 1")  # Ensure rgba is not None
-
-            # Check if geom has mesh or is a box
-            if geom.get("mesh") is None:
-                if geom.get("type") == "box":
-                    new_geom.set("type", "box")
-                    new_geom.set("size", geom.get("size") or "")
-                else:
-                    print(f"Unknown geom type: {geom.get('type')}")
-            else:
-                new_geom.set("mesh", geom.get("mesh"))
-            if geom.get("pos"):
-                new_geom.set("pos", geom.get("pos") or "")
-            if geom.get("quat"):
-                new_geom.set("quat", geom.get("quat") or "")
-            # try:
-            #     # Exclude collision meshes when setting contact
-            #     if geom.get("mesh") not in robot.collision_links and geom.get("mesh") is not None:
-            #         new_geom.set("contype", "0")
-            #         new_geom.set("conaffinity", "0")
-            #         new_geom.set("group", "1")
-            #         new_geom.set("density", "0")
-            # except Exception as e:
-            #     print(e)
-
-            # Append the new geom to the body
-            index = list(body).index(geom)
-            body.insert(index + 1, new_geom)
-
-
-def add_default_position(root: ET.Element) -> None:
-    keyframe = ET.Element("keyframe")
-    key = ET.SubElement(keyframe, "key")
-    key.set("name", "default")
-    key.set("qpos", "0 0 0.63 0. 0.0 0.0 1.0 -0.23 0.0 0.0 0.441 -0.258 -0.23 0.0 0.0 0.441 -0.258")
-    root.append(keyframe)
-
-
 def add_compiler(root: ET.Element) -> None:
     element = ET.Element(
         "compiler",
@@ -332,7 +285,7 @@ def add_actuators(root: ET.Element) -> None:
         else:
             # Fallback to actuatorfrcrange if present, otherwise use a default range
             actuatorfrcrange = joint.attrib.get("actuatorfrcrange")
-            ctrlrange = f"{-200} {200}" #actuatorfrcrange if actuatorfrcrange is not None else "-1.0 1.0"
+            ctrlrange = f"{-200} {200}"  # actuatorfrcrange if actuatorfrcrange is not None else "-1.0 1.0"
 
         ET.SubElement(
             actuator_element,
@@ -465,6 +418,41 @@ def add_cameras(root: ET.Element, distance: float = 3.0, height_offset: float = 
     )
 
 
+def add_visual_geom_logic(root):
+    for body in root.findall(".//body"):
+        original_geoms = list(body.findall("geom"))
+        for geom in original_geoms:
+            geom.set("class", "visualgeom")
+            # Create a new geom element
+            new_geom = ET.Element("geom")
+            new_geom.set("type", geom.get("type") or "")
+            new_geom.set("rgba", geom.get("rgba") or "")
+
+            # Check if geom has mesh or is a box
+            if geom.get("mesh") is None:
+                if geom.get("type") == "box":
+                    new_geom.set("type", "box")
+                    new_geom.set("size", geom.get("size") or "")
+            else:
+                new_geom.set("mesh", geom.get("mesh"))
+            if geom.get("pos"):
+                new_geom.set("pos", geom.get("pos") or "")
+            if geom.get("quat"):
+                new_geom.set("quat", geom.get("quat") or "")
+
+            # Append the new geom to the body
+            index = list(body).index(geom)
+            body.insert(index + 1, new_geom)
+
+
+def add_default_position(root: ET.Element, default_position: str) -> None:
+    keyframe = ET.Element("keyframe")
+    key = ET.SubElement(keyframe, "key")
+    key.set("name", "default")
+    key.set("qpos", default_position)
+    root.append(keyframe)
+
+
 def convert_urdf_to_mjcf(
     urdf_path: str | Path,
     mjcf_path: str | Path | None = None,
@@ -473,6 +461,7 @@ def convert_urdf_to_mjcf(
     camera_distance: float = 3.0,
     camera_height_offset: float = 0.5,
     no_frc_limit: bool = False,
+    default_position: str | None = None,
 ) -> None:
     """Convert a URDF file to an MJCF file.
 
@@ -524,6 +513,7 @@ def convert_urdf_to_mjcf(
         mujoco.mj_saveLastXML(temp_mjcf_path.as_posix(), model)
 
         # Read the MJCF file and update the paths to the meshes
+
         mjcf_tree = ET.parse(temp_mjcf_path)
         root = mjcf_tree.getroot()
 
@@ -560,7 +550,7 @@ def convert_urdf_to_mjcf(
         add_worldbody_elements(root)
         add_actuators(root)
         add_sensors(root)
-        add_default_position(root)
+        add_default_position(root, default_position)
         add_visual_geom_logic(root)
 
         # Copy mesh files to the output directory.
@@ -585,6 +575,12 @@ def main() -> None:
     parser.add_argument("--camera-distance", type=float, default=3.0, help="Camera distance from the robot.")
     parser.add_argument("--camera-height-offset", type=float, default=0.5, help="Camera height offset.")
     parser.add_argument("--no-frc-limit", action="store_true", help="Do not include force limit for the actuators.")
+    parser.add_argument(
+        "--default-position",
+        type=str,
+        default="0 0 0.63 0. 0.0 0.0 1.0 -0.23 0.0 0.0 0.441 -0.258 -0.23 0.0 0.0 0.441 -0.258",
+        help="Default position for the robot.",
+    )
     args = parser.parse_args()
 
     convert_urdf_to_mjcf(
@@ -594,6 +590,8 @@ def main() -> None:
         copy_meshes=args.copy_meshes,
         camera_distance=args.camera_distance,
         camera_height_offset=args.camera_height_offset,
+        no_frc_limit=args.no_frc_limit,
+        default_position=args.default_position,
     )
 
 
