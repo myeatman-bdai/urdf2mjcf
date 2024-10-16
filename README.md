@@ -34,20 +34,6 @@ pip install urdf2mjcf
 
 ## Usage
 
-### Python
-
-To run the conversion script from Python, use:
-
-```python
-from urdf2mjcf import run
-
-run(
-    urdf_path="path/to/your/robot.urdf",
-    mjcf_path="path/to/save/robot.mjcf",
-    copy_meshes=True,
-)
-```
-
 ### Command Line
 
 To run the conversion script from the command line, use:
@@ -62,4 +48,18 @@ To see all the options, use:
 
 ```bash
 urdf2mjcf -h
+```
+
+### Python
+
+To run the conversion script from Python, use:
+
+```python
+from urdf2mjcf import run
+
+run(
+    urdf_path="path/to/your/robot.urdf",
+    mjcf_path="path/to/save/robot.mjcf",
+    copy_meshes=True,
+)
 ```
