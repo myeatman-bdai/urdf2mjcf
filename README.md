@@ -36,9 +36,9 @@ pip install urdf2mjcf
 To run the conversion script from Python, use:
 
 ```python
-from urdf2mjcf import convert_urdf_to_mjcf
+from urdf2mjcf import run
 
-convert_urdf_to_mjcf(
+run(
     urdf_path="path/to/your/robot.urdf",
     mjcf_path="path/to/save/robot.mjcf",
     copy_meshes=True,
