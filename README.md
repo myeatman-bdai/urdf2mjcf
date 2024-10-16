@@ -17,7 +17,6 @@
 
 </div>
 
-
 # urdf2mjcf
 
 ![Example](./docs/example.png)
@@ -32,10 +31,32 @@ pip install urdf2mjcf
 
 ## Usage
 
+### Python
+
+To run the conversion script from Python, use:
+
+```python
+from urdf2mjcf import convert_urdf_to_mjcf
+
+convert_urdf_to_mjcf(
+    urdf_path="path/to/your/robot.urdf",
+    mjcf_path="path/to/save/robot.mjcf",
+    copy_meshes=True,
+)
+```
+
 ### Command Line
+
+To run the conversion script from the command line, use:
+
+```bash
+urdf2mjcf path/to/your/robot.urdf
+```
+
+This will save the MJCF file in the same directory as the URDF file.
 
 To see all the options, use:
 
 ```bash
-urdf2mjcf --help
+urdf2mjcf -h
 ```
