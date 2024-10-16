@@ -11,6 +11,53 @@ import mujoco
 from urdf2mjcf.utils import iter_meshes, save_xml
 
 
+def add_visual_geom_logic(root):
+    # add visual geom logic
+    for body in root.findall(".//body"):
+        original_geoms = list(body.findall("geom"))
+        for geom in original_geoms:
+            geom.set("class", "visualgeom")
+            # Create a new geom element
+            new_geom = ET.Element("geom")
+            new_geom.set("type", geom.get("type") or "")  # Ensure type is not None
+            new_geom.set("rgba", geom.get("rgba") or "1 0.5 0.75 1")  # Ensure rgba is not None
+
+            # Check if geom has mesh or is a box
+            if geom.get("mesh") is None:
+                if geom.get("type") == "box":
+                    new_geom.set("type", "box")
+                    new_geom.set("size", geom.get("size") or "")
+                else:
+                    print(f"Unknown geom type: {geom.get('type')}")
+            else:
+                new_geom.set("mesh", geom.get("mesh"))
+            if geom.get("pos"):
+                new_geom.set("pos", geom.get("pos") or "")
+            if geom.get("quat"):
+                new_geom.set("quat", geom.get("quat") or "")
+            # try:
+            #     # Exclude collision meshes when setting contact
+            #     if geom.get("mesh") not in robot.collision_links and geom.get("mesh") is not None:
+            #         new_geom.set("contype", "0")
+            #         new_geom.set("conaffinity", "0")
+            #         new_geom.set("group", "1")
+            #         new_geom.set("density", "0")
+            # except Exception as e:
+            #     print(e)
+
+            # Append the new geom to the body
+            index = list(body).index(geom)
+            body.insert(index + 1, new_geom)
+
+
+def add_default_position(root: ET.Element) -> None:
+    keyframe = ET.Element("keyframe")
+    key = ET.SubElement(keyframe, "key")
+    key.set("name", "default")
+    key.set("qpos", "0 0 0.63 0. 0.0 0.0 1.0 -0.23 0.0 0.0 0.441 -0.258 -0.23 0.0 0.0 0.441 -0.258")
+    root.append(keyframe)
+
+
 def add_compiler(root: ET.Element) -> None:
     element = ET.Element(
         "compiler",
@@ -281,11 +328,11 @@ def add_actuators(root: ET.Element) -> None:
         upper_limit = limit_element.get("upper") if limit_element is not None else None
 
         if lower_limit is not None and upper_limit is not None:
-            ctrlrange = f"{lower_limit} {upper_limit}"
+            ctrlrange = f"{-200} {200}"
         else:
             # Fallback to actuatorfrcrange if present, otherwise use a default range
             actuatorfrcrange = joint.attrib.get("actuatorfrcrange")
-            ctrlrange = actuatorfrcrange if actuatorfrcrange is not None else "-1.0 1.0"
+            ctrlrange = f"{-200} {200}" #actuatorfrcrange if actuatorfrcrange is not None else "-1.0 1.0"
 
         ET.SubElement(
             actuator_element,
@@ -322,6 +369,7 @@ def add_sensors(root: ET.Element) -> None:
                 attrib={
                     "name": f"{actuator_name}_p",
                     "actuator": actuator_name,
+                    "user": "13",
                 },
             )
 
@@ -332,6 +380,7 @@ def add_sensors(root: ET.Element) -> None:
                 attrib={
                     "name": f"{actuator_name}_v",
                     "actuator": actuator_name,
+                    "user": "13",
                 },
             )
 
@@ -343,6 +392,7 @@ def add_sensors(root: ET.Element) -> None:
                     "name": f"{actuator_name}_f",
                     "actuator": actuator_name,
                     "noise": "0.001",
+                    "user": "13",
                 },
             )
 
@@ -422,13 +472,14 @@ def convert_urdf_to_mjcf(
     copy_meshes: bool = False,
     camera_distance: float = 3.0,
     camera_height_offset: float = 0.5,
+    no_frc_limit: bool = False,
 ) -> None:
     """Convert a URDF file to an MJCF file.
 
     Args:
         urdf_path: The path to the URDF file.
         mjcf_path: The path to the MJCF file. If not provided, use the URDF
-            path with the extension replaced with ".mjcf".
+            path with the extension replaced with ".xml".
         no_collision_mesh: Do not include collision meshes.
         copy_meshes: Copy mesh files to the output MJCF directory if different
             from URDF directory.
@@ -436,7 +487,7 @@ def convert_urdf_to_mjcf(
         camera_height_offset: Height offset of the fixed camera from the robot.
     """
     urdf_path = Path(urdf_path)
-    mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".mjcf")
+    mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".xml")
     if not Path(urdf_path).exists():
         raise FileNotFoundError(f"URDF file not found: {urdf_path}")
     mjcf_path.parent.mkdir(parents=True, exist_ok=True)
@@ -482,11 +533,18 @@ def convert_urdf_to_mjcf(
                 # Update the file attribute to just the mesh name
                 mesh.attrib["file"] = mesh_name
 
+        if not no_frc_limit:
+            for joint in root.iter("joint"):
+                if "actuatorfrcrange" in joint.attrib:
+                    del joint.attrib["actuatorfrcrange"]
+
         # Turn off internal collisions
         if not no_collision_mesh:
             for geom in root.iter("geom"):
                 geom.attrib["contype"] = str(1)
                 geom.attrib["conaffinity"] = str(0)
+                geom.attrib["density"] = str(0)
+                geom.attrib["group"] = str(1)
 
         # Manually set additional options.
         add_default(root)
@@ -502,6 +560,8 @@ def convert_urdf_to_mjcf(
         add_worldbody_elements(root)
         add_actuators(root)
         add_sensors(root)
+        add_default_position(root)
+        add_visual_geom_logic(root)
 
         # Copy mesh files to the output directory.
         if copy_meshes:
@@ -524,6 +584,7 @@ def main() -> None:
     parser.add_argument("--copy-meshes", action="store_true", help="Copy mesh files to the output MJCF directory.")
     parser.add_argument("--camera-distance", type=float, default=3.0, help="Camera distance from the robot.")
     parser.add_argument("--camera-height-offset", type=float, default=0.5, help="Camera height offset.")
+    parser.add_argument("--no-frc-limit", action="store_true", help="Do not include force limit for the actuators.")
     args = parser.parse_args()
 
     convert_urdf_to_mjcf(
