@@ -324,7 +324,6 @@ def add_sensors(root: ET.Element) -> None:
                 attrib={
                     "name": f"{actuator_name}_p",
                     "actuator": actuator_name,
-                    "user": "13",
                 },
             )
 
@@ -335,7 +334,6 @@ def add_sensors(root: ET.Element) -> None:
                 attrib={
                     "name": f"{actuator_name}_v",
                     "actuator": actuator_name,
-                    "user": "13",
                 },
             )
 
@@ -347,7 +345,6 @@ def add_sensors(root: ET.Element) -> None:
                     "name": f"{actuator_name}_f",
                     "actuator": actuator_name,
                     "noise": "0.001",
-                    "user": "13",
                 },
             )
 
@@ -441,7 +438,7 @@ def add_visual_geom_logic(root: ET.Element) -> None:
                     new_geom.set("type", "box")
                     new_geom.set("size", geom.get("size") or "")
             else:
-                new_geom.set("mesh", geom.get("mesh"))
+                new_geom.set("mesh", geom.get("mesh") or "")
             if geom.get("pos"):
                 new_geom.set("pos", geom.get("pos") or "")
             if geom.get("quat"):
@@ -537,7 +534,7 @@ def convert_urdf_to_mjcf(
                 # Update the file attribute to just the mesh name
                 mesh.attrib["file"] = mesh_name
 
-        if not no_frc_limit:
+        if no_frc_limit:
             for joint in root.iter("joint"):
                 if "actuatorfrcrange" in joint.attrib:
                     del joint.attrib["actuatorfrcrange"]

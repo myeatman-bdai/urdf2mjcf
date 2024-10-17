@@ -11,7 +11,8 @@ from urdf2mjcf.convert import convert_urdf_to_mjcf
 @pytest.mark.slow
 def test_conversion_output(tmpdir: Path) -> None:
     urdf_path = Path(__file__).parent / "sample" / "robot.urdf"
-    mjcf_path = Path(__file__).parent / "sample" / "robot.xml"
+    mjcf_path = tmpdir / "robot.mjcf"
+
     convert_urdf_to_mjcf(
         urdf_path=urdf_path,
         mjcf_path=mjcf_path,
@@ -23,16 +24,17 @@ def test_conversion_output(tmpdir: Path) -> None:
 @pytest.mark.slow
 def test_conversion_no_frc_limit(tmpdir: Path) -> None:
     urdf_path = Path(__file__).parent / "sample" / "robot.urdf"
+    mjcf_path = tmpdir / "robot.mjcf"
 
     convert_urdf_to_mjcf(
         urdf_path=urdf_path,
+        mjcf_path=mjcf_path,
         no_frc_limit=True,
         copy_meshes=False,
         default_position="0.0 0.0 0.63 0.0 0.0 0.0 1.0 -0.23 0.0 0.0 0.441 -0.258 -0.23 0.0 0.0 0.441 -0.258",
     )
 
     # Compare the outputted MJCF with the expected XML
-    mjcf_path = Path(__file__).parent / "sample" / "robot.xml"
     expected_mjcf_path = Path(__file__).parent / "sample" / "robot_test.xml"
     with open(mjcf_path, "r") as output_file, open(expected_mjcf_path, "r") as expected_file:
         output_content = output_file.read()
