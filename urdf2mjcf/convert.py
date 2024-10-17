@@ -471,7 +471,7 @@ def convert_urdf_to_mjcf(
     camera_distance: float = 3.0,
     camera_height_offset: float = 0.5,
     no_frc_limit: bool = False,
-    default_position: str | None = None,
+    default_position: Union[str, None] = None,
 ) -> None:
     """Convert a URDF file to an MJCF file.
 
