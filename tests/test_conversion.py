@@ -28,6 +28,7 @@ def test_conversion_no_frc_limit(tmpdir: Path) -> None:
         urdf_path=urdf_path,
         no_frc_limit=True,
         copy_meshes=False,
+        default_position="0.0 0.0 0.63 0.0 0.0 0.0 1.0 -0.23 0.0 0.0 0.441 -0.258 -0.23 0.0 0.0 0.441 -0.258",
     )
 
     # Compare the outputted MJCF with the expected XML
@@ -36,6 +37,7 @@ def test_conversion_no_frc_limit(tmpdir: Path) -> None:
     with open(mjcf_path, "r") as output_file, open(expected_mjcf_path, "r") as expected_file:
         output_content = output_file.read()
         expected_content = expected_file.read()
+
         assert output_content == expected_content, "The output MJCF does not match the expected XML."
 
 
@@ -43,3 +45,4 @@ if __name__ == "__main__":
     # python -m tests.test_conversion
     with tempfile.TemporaryDirectory() as temp_dir:
         test_conversion_output(Path(temp_dir))
+        test_conversion_no_frc_limit(Path(temp_dir))

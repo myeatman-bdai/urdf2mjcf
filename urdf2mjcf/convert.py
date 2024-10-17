@@ -267,7 +267,7 @@ def add_worldbody_elements(root: ET.Element) -> None:
     )
 
 
-def add_actuators(root: ET.Element) -> None:
+def add_actuators(root: ET.Element, no_frc_limit: bool = False) -> None:
     actuator_element = ET.Element("actuator")
 
     # For each joint, add a motor actuator
@@ -281,12 +281,13 @@ def add_actuators(root: ET.Element) -> None:
         lower_limit = limit_element.get("lower") if limit_element is not None else None
         upper_limit = limit_element.get("upper") if limit_element is not None else None
 
-        if lower_limit is not None and upper_limit is not None:
-            ctrlrange = f"{-200} {200}"
+        if no_frc_limit:
+            ctrlrange = "-200 200"
+        elif lower_limit is not None and upper_limit is not None:
+            ctrlrange = f"{lower_limit} {upper_limit}"
         else:
-            # Fallback to actuatorfrcrange if present, otherwise use a default range
             actuatorfrcrange = joint.attrib.get("actuatorfrcrange")
-            ctrlrange = f"{-200} {200}"  # actuatorfrcrange if actuatorfrcrange is not None else "-1.0 1.0"
+            ctrlrange = actuatorfrcrange if actuatorfrcrange is not None else "-1 1"
 
         ET.SubElement(
             actuator_element,
@@ -419,7 +420,12 @@ def add_cameras(root: ET.Element, distance: float = 3.0, height_offset: float = 
     )
 
 
-def add_visual_geom_logic(root):
+def add_visual_geom_logic(root: ET.Element) -> None:
+    """Add visual geom logic to the root element.
+
+    Args:
+        root: The root element of the MJCF file.
+    """
     for body in root.findall(".//body"):
         original_geoms = list(body.findall("geom"))
         for geom in original_geoms:
@@ -447,6 +453,12 @@ def add_visual_geom_logic(root):
 
 
 def add_default_position(root: ET.Element, default_position: str) -> None:
+    """Add a keyframe to the root element.
+
+    Args:
+        root: The root element of the MJCF file.
+        default_position: The default position of the robot.
+    """
     keyframe = ET.Element("keyframe")
     key = ET.SubElement(keyframe, "key")
     key.set("name", "default")
@@ -475,6 +487,8 @@ def convert_urdf_to_mjcf(
             from URDF directory.
         camera_distance: Distance of the fixed camera from the robot.
         camera_height_offset: Height offset of the fixed camera from the robot.
+        no_frc_limit: Do not include force limit for the actuators.
+        default_position: Default position for the robot.
     """
     urdf_path = Path(urdf_path)
     mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".xml")
@@ -514,7 +528,6 @@ def convert_urdf_to_mjcf(
         mujoco.mj_saveLastXML(temp_mjcf_path.as_posix(), model)
 
         # Read the MJCF file and update the paths to the meshes
-
         mjcf_tree = ET.parse(temp_mjcf_path)
         root = mjcf_tree.getroot()
 
@@ -549,10 +562,11 @@ def convert_urdf_to_mjcf(
         )
         add_root_body(root)
         add_worldbody_elements(root)
-        add_actuators(root)
+        add_actuators(root, no_frc_limit)
         add_sensors(root)
-        add_default_position(root, default_position)
         add_visual_geom_logic(root)
+        if default_position:
+            add_default_position(root, default_position)
 
         # Copy mesh files to the output directory.
         if copy_meshes:
@@ -579,7 +593,7 @@ def main() -> None:
     parser.add_argument(
         "--default-position",
         type=str,
-        default="0 0 0.63 0. 0.0 0.0 1.0 -0.23 0.0 0.0 0.441 -0.258 -0.23 0.0 0.0 0.441 -0.258",
+        default="0.0 0.0 0.63 0.0 0.0 0.0 1.0 -0.23 0.0 0.0 0.441 -0.258 -0.23 0.0 0.0 0.441 -0.258",
         help="Default position for the robot.",
     )
     args = parser.parse_args()
