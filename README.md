@@ -22,44 +22,6 @@
 
 # urdf2mjcf
 
-![Example](./docs/example.png)
+Convert URDF to MJCF XML.
 
-This script converts URDF files to MJCF files, with some nice options.
-
-## Installation
-
-```bash
-pip install urdf2mjcf
-```
-
-## Usage
-
-### Command Line
-
-To run the conversion script from the command line, use:
-
-```bash
-urdf2mjcf path/to/your/robot.urdf
-```
-
-This will save the MJCF file in the same directory as the URDF file.
-
-To see all the options, use:
-
-```bash
-urdf2mjcf -h
-```
-
-### Python
-
-To run the conversion script from Python, use:
-
-```python
-from urdf2mjcf import run
-
-run(
-    urdf_path="path/to/your/robot.urdf",
-    mjcf_path="path/to/save/robot.mjcf",
-    copy_meshes=True,
-)
-```
+See the documentation for this project [here](https://docs.kscale.dev/software/utils/urdf2mjcf).
