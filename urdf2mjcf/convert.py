@@ -5,8 +5,7 @@ import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Union, Tuple
-import numpy as np
+from typing import List, Union
 
 import mujoco
 
