@@ -5,7 +5,7 @@ import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Union
+from typing import Union
 
 import mujoco
 
@@ -419,28 +419,6 @@ def add_visual_geom_logic(root: ET.Element) -> None:
             body.insert(index + 1, new_geom)
 
 
-def add_default_position(root: ET.Element, default_position: List[float]) -> None:
-    """Add a keyframe to the root element.
-
-    Args:
-        root: The root element of the MJCF file.
-        default_position: The default position of the robot.
-    """
-    actuators = root.find("actuator")
-    if actuators is None:
-        raise ValueError("No actuators found in the MJCF file.")
-
-    num_actuators = len(list(actuators.iter("motor")))
-    if len(default_position) != num_actuators:
-        raise ValueError(f"Default position must have {num_actuators} values, got {len(default_position)}.")
-
-    keyframe = ET.Element("keyframe")
-    key = ET.SubElement(keyframe, "key")
-    key.set("name", "default")
-    key.set("qpos", " ".join(map(str, default_position)))
-    root.append(keyframe)
-
-
 def convert_urdf_to_mjcf(
     urdf_path: Union[str, Path],
     mjcf_path: Union[str, Path, None] = None,
@@ -449,7 +427,6 @@ def convert_urdf_to_mjcf(
     camera_distance: float = 3.0,
     camera_height_offset: float = 0.5,
     no_frc_limit: bool = False,
-    default_position: Union[List[float], None] = None,
 ) -> None:
     """Convert a URDF file to an MJCF file.
 
@@ -463,7 +440,6 @@ def convert_urdf_to_mjcf(
         camera_distance: Distance of the fixed camera from the robot.
         camera_height_offset: Height offset of the fixed camera from the robot.
         no_frc_limit: Do not include force limit for the actuators.
-        default_position: Default position for the robot.
     """
     urdf_path = Path(urdf_path)
     mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".xml")
@@ -542,8 +518,6 @@ def convert_urdf_to_mjcf(
         add_actuators(root, no_frc_limit)
         add_sensors(root)
         add_visual_geom_logic(root)
-        if default_position is not None:
-            add_default_position(root, default_position)
 
         # Copy mesh files to the output directory.
         if copy_meshes:
