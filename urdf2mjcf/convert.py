@@ -5,7 +5,8 @@ import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Tuple
+import numpy as np
 
 import mujoco
 
@@ -143,46 +144,17 @@ def add_assets(root: ET.Element) -> None:
     )
 
 
-def get_max_foot_distance(root: ET.Element) -> float:
-    def recursive_search(element: ET.Element, current_z: float = 0) -> float:
-        max_distance = 0.0
-        for child in element:
-            if child.tag == "body":
-                body_pos = child.get("pos")
-                if body_pos:
-                    body_z = float(body_pos.split()[2])
-                else:
-                    body_z = 0
-                max_distance = max(max_distance, recursive_search(child, current_z + body_z))
-            elif child.tag == "geom":
-                geom_pos = child.get("pos")
-                if geom_pos:
-                    geom_z = float(geom_pos.split()[2])
-                    max_distance = max(max_distance, -(current_z + geom_z))
-        return max_distance
-
-    worldbody = root.find("worldbody")
-    if worldbody is None:
-        return 0.0
-    return recursive_search(worldbody)
-
-
-def add_root_body(root: ET.Element) -> None:
+def add_root_body(root: ET.Element, foot_distance: float) -> None:
     worldbody = root.find("worldbody")
     if worldbody is None:
         worldbody = ET.SubElement(root, "worldbody")
-
-    # Calculate the initial height
-    foot_distance = get_max_foot_distance(root)
-    epsilon = 0.01
-    initial_height = foot_distance + epsilon
 
     # Create a root body
     root_body = ET.Element(
         "body",
         attrib={
             "name": "root",
-            "pos": f"0 0 {initial_height}",  # Set the initial height
+            "pos": f"0 0 {foot_distance}",  # Set the initial height
             "quat": "1 0 0 0",
         },
     )
@@ -205,23 +177,12 @@ def add_root_body(root: ET.Element) -> None:
         },
     )
 
-    # Create base body
-    base_body = ET.SubElement(
-        root_body,
-        "body",
-        attrib={
-            "name": "base",
-            "pos": "0 0 0",
-            "quat": "1 0 0 0",
-        },
-    )
-
-    # Move existing bodies and geoms under base_body
+    # Move existing bodies and geoms under root_body
     elements_to_move = list(worldbody)
     for elem in elements_to_move:
         if elem.tag in {"body", "geom"}:
             worldbody.remove(elem)
-            base_body.append(elem)
+            root_body.append(elem)
     worldbody.append(root_body)
 
 
@@ -396,12 +357,11 @@ def add_sensors(root: ET.Element) -> None:
     root.append(sensor_element)
 
 
-def add_cameras(root: ET.Element, distance: float = 3.0, height_offset: float = 0.5) -> None:
+def add_cameras(root: ET.Element, foot_distance: float, distance: float = 3.0, height_offset: float = 0.5) -> None:
     worldbody = root.find("worldbody")
     if worldbody is None:
         return
 
-    foot_distance = get_max_foot_distance(root)
     camera_height = foot_distance + height_offset
 
     # Add a fixed camera
@@ -460,43 +420,21 @@ def add_visual_geom_logic(root: ET.Element) -> None:
             body.insert(index + 1, new_geom)
 
 
-def calculate_dof_from_xml(root: ET.Element) -> int:
-    """Calculate the total DOF (qpos size) of a robot based on the XML tree.
-
-    Free joints add 7 DOFs, and joints with a 'range' attribute add 1 DOF each.
-
-    Args:
-        root: Root element of the MJCF XML.
-
-    Returns:
-        Total DOF (qpos size).
-    """
-    dof = 0
-
-    # Count free joints
-    for _ in root.iter("freejoint"):
-        dof += 7
-
-    # Count joints with a 'range' attribute
-    for joint in root.iter("joint"):
-        if "range" in joint.attrib:
-            dof += 1
-
-    return dof
-
-
 def add_default_position(root: ET.Element, default_position: List[float]) -> None:
-    """Add a keyframe to the root element with the default start position.
+    """Add a keyframe to the root element.
 
     Args:
         root: The root element of the MJCF file.
-        default_position: The default positions of the robot.
+        default_position: The default position of the robot.
     """
-    num_dof = calculate_dof_from_xml(root)
-    if len(default_position) != num_dof:
-        raise ValueError(f"Default position must have {num_dof} values, got {len(default_position)}.")
+    actuators = root.find("actuator")
+    if actuators is None:
+        raise ValueError("No actuators found in the MJCF file.")
 
-    # Add the keyframe with the default position
+    num_actuators = len(list(actuators.iter("motor")))
+    if len(default_position) != num_actuators:
+        raise ValueError(f"Default position must have {num_actuators} values, got {len(default_position)}.")
+
     keyframe = ET.Element("keyframe")
     key = ET.SubElement(keyframe, "key")
     key.set("name", "default")
@@ -562,7 +500,13 @@ def convert_urdf_to_mjcf(
 
         # Load the URDF file with Mujoco and save it as an MJCF file in the temp directory
         temp_mjcf_path = temp_dir_path / mjcf_path.name
+
+        # Get the distance to the lowest point on the robot, to offset the root body.
         model = mujoco.MjModel.from_xml_path(temp_urdf_path.as_posix())
+        data = mujoco.MjData(model)
+        mujoco.mj_fwdPosition(model, data)
+        foot_distance = -(data.geom_xpos[:, 2] - model.geom_size[:, 2]).min()
+
         mujoco.mj_saveLastXML(temp_mjcf_path.as_posix(), model)
 
         # Read the MJCF file and update the paths to the meshes
@@ -593,8 +537,8 @@ def convert_urdf_to_mjcf(
         add_compiler(root)
         add_option(root)
         add_assets(root)
-        add_cameras(root, distance=camera_distance, height_offset=camera_height_offset)
-        add_root_body(root)
+        add_cameras(root, foot_distance, distance=camera_distance, height_offset=camera_height_offset)
+        add_root_body(root, foot_distance)
         add_worldbody_elements(root)
         add_actuators(root, no_frc_limit)
         add_sensors(root)
