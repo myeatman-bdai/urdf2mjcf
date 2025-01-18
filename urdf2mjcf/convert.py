@@ -541,7 +541,6 @@ def main() -> None:
     parser.add_argument("--camera-distance", type=float, default=3.0, help="Camera distance from the robot.")
     parser.add_argument("--camera-height-offset", type=float, default=0.5, help="Camera height offset.")
     parser.add_argument("--no-frc-limit", action="store_true", help="Do not include force limit for the actuators.")
-    parser.add_argument("--default-position", type=str, help="Default position for the robot.")
     args = parser.parse_args()
 
     convert_urdf_to_mjcf(
@@ -552,7 +551,6 @@ def main() -> None:
         camera_distance=args.camera_distance,
         camera_height_offset=args.camera_height_offset,
         no_frc_limit=args.no_frc_limit,
-        default_position=None if args.default_position is None else list(map(float, args.default_position.split())),
     )
 
 
