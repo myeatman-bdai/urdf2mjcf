@@ -18,4 +18,4 @@
 
 Convert URDF to MJCF XML.
 
-See the documentation for this project [here](https://docs.kscale.dev/update/docs/urdf2mjcf).
+See the documentation for this project [here](https://docs.kscale.dev/docs/urdf2mjcf).
