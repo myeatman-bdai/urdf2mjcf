@@ -1,499 +1,870 @@
-<robot name="robot">
-  <link name="base">
+<robot name="simple_humanoid">
+  <link name="base_link"/>
+
+  <material name="WAIST_LINK1_APP">
+    <color rgba="0.6 1.0 0.6 1"/>
+  </material>
+
+  <material name="WAIST_LINK2_APP">
+    <color rgba="0.6 0.8 0.6 1"/>
+  </material>
+
+  <material name="WAIST_LINK3_APP">
+    <color rgba="0.8 0.8 0.8 1"/>
+  </material>
+
+  <!-- VRML link name="WAIST_LINK0" -->
+  <link name="BODY">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
-      <mass value="0.001" />
-      <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001" />
-      </inertial>
-    </link>
-  <joint name="floating_base" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.0" />
-    <parent link="base" />
-    <child link="trunk" />
-    </joint>
-  <link name="trunk">
-    <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.00051930492 0.00030343937 0.21140495" />
-      <mass value="13.05315" />
-      <inertia ixx="0.56635021" ixy="-5.2717245e-05" ixz="-0.00020117771" iyy="0.462714" iyz="0.00062003391" izz="0.13193241" />
-      </inertial>
+      <origin xyz="0 0 0.0375" rpy="0 0 0"/>
+      <mass value="27"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+      <origin xyz="0 0 0.0955" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/trunk.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
-      <geometry>
-        <mesh filename="meshes/trunk.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_hip_y" type="revolute">
-    <origin rpy="0 0 0" xyz="0 0.1577 0" />
-    <parent link="trunk" />
-    <child link="L_buttock" />
-    <axis xyz="0.0 1.0 0" />
-    <limit effort="250" lower="-3.14" upper="3.14" velocity="10" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="L_buttock">
-    <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0012918323 -0.0018432774 2.2794594e-05" />
-      <mass value="1.2990888" />
-      <inertia ixx="0.0020931102" ixy="-1.0314072e-05" ixz="5.1795876e-07" iyy="0.0013118768" iyz="-4.0767562e-07" izz="0.0015000916" />
-      </inertial>
+	<box size="0.05 0.05 0.111"/>
+      </geometry>
+    </visual>
+
     <visual>
-      <origin rpy="3.1415926 0 0" xyz="0 0 0" />
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/buttock.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="3.1415926 0 0" xyz="0 0 0" />
-      <geometry>
-        <mesh filename="meshes/buttock.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_hip_x" type="revolute">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
-    <parent link="L_buttock" />
-    <child link="L_leg" />
-    <axis xyz="1.0 0.0 0.0" />
-    <limit effort="100" lower="-0.523" upper="2.093" velocity="10" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="L_leg">
+	<box size="0.08 0.08 0.08"/>
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="WAIST_LINK1">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.00070860204 -2.2435483e-05 -0.11035196" />
-      <mass value="1.3398346" />
-      <inertia ixx="0.00350784" ixy="3.4919088e-07" ixz="-0.00015597216" iyy="0.0037534076" iyz="-7.0069817e-08" izz="0.0018582238" />
-      </inertial>
+      <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+      <mass value="6"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/leg.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
-      <geometry>
-        <mesh filename="meshes/leg.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_hip_z" type="revolute">
-    <origin rpy="0.0 0 0.0" xyz="0 0 0" />
-    <parent link="L_leg" />
-    <child link="L_thigh" />
-    <axis xyz="0.0 0.0 1.0" />
-    <limit effort="100" lower="-3.14" upper="3.14" velocity="10" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="L_thigh">
+        <cylinder length="0.05" radius="0.025"/>
+      </geometry>
+      <material name="WAIST_LINK1_APP"/>
+    </visual>
+
+  </link>
+
+  <link name="WAIST_LINK2">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.00040735676 0.0013053813 -0.29165284" />
-      <mass value="1.9399504" />
-      <inertia ixx="0.0044937128" ixy="2.1462344e-05" ixz="1.0739651e-05" iyy="0.0060757923" iyz="-2.6643735e-05" izz="0.0029354143" />
-      </inertial>
+      <origin xyz="0.11 0 0.25" rpy="0 0 0"/>
+      <mass value="30"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <geometry>
+        <cylinder length="0.05" radius="0.025"/>
+      </geometry>
+      <material name="WAIST_LINK2_APP"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0.1625" rpy="0 0 0" />
+      <geometry>
+	<box size="0.05 0.05 0.275" />
+      </geometry>
+      <material name="WAIST_LINK2_APP"/>
+    </visual>
+
+  </link>
+
+  <!-- VRML link name="WAIST_LINK3" -->
+  <link name="torso">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="13"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0" />
+      <geometry>
+	<cylinder length="0.1" radius="0.025" />
+      </geometry>
+      <material name="WAIST_LINK3_APP"/>
+    </visual>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/mthigh.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
+	<box size="0.15 0.27 0.05" />
+      </geometry>
+      <material name="WAIST_LINK3_APP"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0.065" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/mthigh.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_knee" type="revolute">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 -0.3" />
-    <parent link="L_thigh" />
-    <child link="L_calf" />
-    <axis xyz="0.0 1.0 0.0" />
-    <limit effort="250" lower="-1.919" upper="1.919" velocity="10" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="L_calf">
+	<box size="0.05 0.05 0.03" />
+      </geometry>
+      <material name="WAIST_LINK3_APP"/>
+    </visual>
+
+    <visual>
+      <origin xyz="-0.015 0 0.16" rpy="0 0 0" />
+      <geometry>
+	<box size="0.31 0.16 0.16" />
+      </geometry>
+      <material name="WAIST_LINK3_APP"/>
+    </visual>
+
+  </link>
+
+  <link name="LARM_LINK1">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.0019535236 -0.0043433803 -0.13404794" />
-      <mass value="1.544772" />
-      <inertia ixx="0.0097259036" ixy="-4.7543777e-05" ixz="-0.00019535575" iyy="0.0098345988" iyz="-0.00037837351" izz="0.0014598955" />
-      </inertial>
+      <origin xyz="0.1 0 0" rpy="0 0 0"/>
+      <mass value="3"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 -0.05 0.0" rpy="0 0 0" />
+      <geometry>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="LARM_LINK2">
+    <inertial>
+      <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+      <mass value="0.6"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0.0 0.0" rpy="0 0 1.5708" />
+      <geometry>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0.0 -0.1065" rpy="0 0 0" />
+      <geometry>
+	<box size="0.05 0.05 0.163" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="LARM_LINK3">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0.0 0.05" rpy="1.5708 0 0 " />
+      <geometry>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="LARM_LINK4">
+    <inertial>
+      <origin xyz="0 0 -0.3" rpy="0 0 0"/>
+      <mass value="0.6"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/mcalf.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+      <material name="WAIST_LINK3_APP"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0.0 -0.0985" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/mcalf.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_ankle_y" type="revolute">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 -0.3" />
-    <parent link="L_calf" />
-    <child link="L_foot" />
-    <axis xyz="0.0 1.0 0.0" />
-    <limit effort="17" lower="-0.698" upper="0.698" velocity="10" />
-    <dynamics damping="0" friction="0.01" />
-    </joint>
-  <link name="L_foot">
+	<box size="0.05 0.05 0.147" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="LARM_LINK5">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.023366504 0.014827011 -0.016531354" />
-      <mass value="0.54237266" />
-      <inertia ixx="0.00025746264" ixy="-3.4761901e-05" ixz="3.5533704e-05" iyy="0.0019652138" iyz="3.5259776e-06" izz="0.0021498817" />
-      </inertial>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+      <mass value="0.4"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0.05" rpy="1.5708 0 0"/>
+      <geometry>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="LARM_LINK6">
+    <inertial>
+      <origin xyz="-0.1 0 0" rpy="0 0 0"/>
+      <mass value="0.4"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/mfoot.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0.0 0.0 0.0" xyz="30e-3 -11e-3 -20e-3" />
-      <geometry>
-        <box size="220e-3 80e-3 15e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_hip_y" type="revolute">
-    <origin rpy="0 0 0" xyz="0 -0.1577 0" />
-    <parent link="trunk" />
-    <child link="R_buttock" />
-    <axis xyz="0.0 1.0 0" />
-    <limit effort="250" lower="-3.14" upper="3.14" velocity="10" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="R_buttock">
-    <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0012918323 0.0018432774 2.2794594e-05" />
-      <mass value="1.2990888" />
-      <inertia ixx="0.0020931102" ixy="1.0314072e-05" ixz="5.1795876e-07" iyy="0.0013118768" iyz="4.0767562e-07" izz="0.0015000916" />
-      </inertial>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0" />
+      <origin xyz="0 0 0" rpy="0 0 1.5708"/>
       <geometry>
-        <mesh filename="meshes/buttock.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
-      <geometry>
-        <mesh filename="meshes/buttock.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_hip_x" type="revolute">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
-    <parent link="R_buttock" />
-    <child link="R_leg" />
-    <axis xyz="1.0 0.0 0.0" />
-    <limit effort="100" lower="-2.093" upper="0.523" velocity="10" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="R_leg">
-    <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.00070860204 2.2435483e-05 -0.11035196" />
-      <mass value="1.3398346" />
-      <inertia ixx="0.00350784" ixy="-3.4919088e-07" ixz="-0.00015597216" iyy="0.0037534076" iyz="7.0069817e-08" izz="0.0018582238" />
-      </inertial>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
     <visual>
+      <origin xyz="0 0.03 -0.1125" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/leg.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
-      <geometry>
-        <mesh filename="meshes/leg.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_hip_z" type="revolute">
-    <origin rpy="0.0 0 0.0" xyz="0 0 0" />
-    <parent link="R_leg" />
-    <child link="R_thigh" />
-    <axis xyz="0.0 0.0 1.0" />
-    <limit effort="100" lower="-3.14" upper="3.14" velocity="10" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="R_thigh">
+	<box size="0.05 0.03 0.175" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <!-- VRML link name="LARM_LINK7" -->
+  <link name="l_wrist">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.00040735676 -0.0013053813 -0.29165284" />
-      <mass value="1.9399504" />
-      <inertia ixx="0.0044937128" ixy="-2.1462344e-05" ixz="1.0739651e-05" iyy="0.0060757923" iyz="2.6643735e-05" izz="0.0029354143" />
-      </inertial>
+      <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+      <mass value="0.4"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
+      <origin xyz="0 -0.03 -0.1" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/thigh.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
-      <geometry>
-        <mesh filename="meshes/thigh.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_knee" type="revolute">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 -0.3" />
-    <parent link="R_thigh" />
-    <child link="R_calf" />
-    <axis xyz="0.0 1.0 0.0" />
-    <limit effort="250" lower="-1.919" upper="1.919" velocity="10" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="R_calf">
+	<box size="0.05 0.03 0.15" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="RARM_LINK1">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.0019535236 0.0043433803 -0.13404794" />
-      <mass value="1.544772" />
-      <inertia ixx="0.0097259036" ixy="4.7543777e-05" ixz="-0.00019535575" iyy="0.0098345988" iyz="0.00037837351" izz="0.0014598955" />
-      </inertial>
+      <origin xyz="0.1 0 0" rpy="0 0 0"/>
+      <mass value="3"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0.05 0.0" rpy="0 0 0" />
+      <geometry>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="RARM_LINK2">
+    <inertial>
+      <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+      <mass value="0.6"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0.0 0.0" rpy="0 0 1.5708" />
+      <geometry>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0.0 -0.1065" rpy="0 0 0" />
+      <geometry>
+	<box size="0.05 0.05 0.163" />
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="RARM_LINK3">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0.0 0.05" rpy="1.5708 0 0 " />
+      <geometry>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="RARM_LINK4">
+    <inertial>
+      <origin xyz="0 0 -0.3" rpy="0 0 0"/>
+      <mass value="0.6"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/calf.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+      <material name="WAIST_LINK3_APP"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0.0 -0.0985" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/calf.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_ankle_y" type="revolute">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 -0.3" />
-    <parent link="R_calf" />
-    <child link="R_foot" />
-    <axis xyz="0.0 1.0 0.0" />
-    <limit effort="17" lower="-0.698" upper="0.698" velocity="10" />
-    <dynamics damping="0" friction="0.01" />
-    </joint>
-  <link name="R_foot">
+	<box size="0.05 0.05 0.147" />
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="RARM_LINK5">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.023366504 0.014827011 -0.016531354" />
-      <mass value="0.54237266" />
-      <inertia ixx="0.00025746264" ixy="-3.4761901e-05" ixz="3.5533704e-05" iyy="0.0019652138" iyz="3.5259776e-06" izz="0.0021498817" />
-      </inertial>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+      <mass value="0.4"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0.05" rpy="1.5708 0 0"/>
+      <geometry>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="RARM_LINK6">
+    <inertial>
+      <origin xyz="-0.1 0 0" rpy="0 0 0"/>
+      <mass value="0.4"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/foot.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0.0 0.0 0.0" xyz="30e-3 11e-3 -20e-3" />
-      <geometry>
-        <box size="220e-3 80e-3 15e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_shoulder_y" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.255 0.45" />
-    <parent link="trunk" />
-    <child link="L_clav" />
-    <axis xyz="0.0 1.0 0.0" />
-    <limit effort="60" lower="-3.1416" upper="3.1416" velocity="0" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="L_clav">
-    <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0012122056 -0.0015095858 -9.3677479e-05" />
-      <mass value="1.1246895" />
-      <inertia ixx="0.0017070766" ixy="-2.3820729e-06" ixz="-6.7619904e-06" iyy="0.0010595629" iyz="-3.2352008e-07" izz="0.001122517" />
-      </inertial>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
     <visual>
-      <origin rpy="-3.1415926 0 0" xyz="0 0 0" />
+      <origin xyz="0 0 0" rpy="0 0 1.5708"/>
       <geometry>
-        <mesh filename="meshes/clav.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="-3.1415926 0 0" xyz="0 0 0" />
-      <geometry>
-        <mesh filename="meshes/clav.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_shoulder_x" type="fixed">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
-    <parent link="L_clav" />
-    <child link="L_scapula" />
-    <axis xyz="1.0 0.0 0.0" />
-    <limit effort="60" lower="0" upper="3.1416" velocity="0" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="L_scapula">
-    <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0038106082 -0.0001642433 -0.095219061" />
-      <mass value="0.65454544" />
-      <inertia ixx="0.0011234347" ixy="-4.6391796e-06" ixz="-0.00021802428" iyy="0.0011878253" iyz="-1.8375484e-06" izz="0.00058824357" />
-      </inertial>
+	<cylinder length="0.05" radius="0.025" />
+      </geometry>
+    </visual>
+
     <visual>
+      <origin xyz="0 0.03 -0.1125" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/scap.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <geometry>
-        <mesh filename="meshes/scap.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_shoulder_z" type="fixed">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
-    <parent link="L_scapula" />
-    <child link="L_uarm" />
-    <axis xyz="0.0 0.0 1.0" />
-    <limit effort="17" lower="-3.14" upper="3.14" velocity="0" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="L_uarm">
+	<box size="0.05 0.03 0.175" />
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- VRML link name="RARM_LINK7" -->
+  <link name="r_wrist">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.0039088302 0.00017072539 -0.22223086" />
-      <mass value="0.58244405" />
-      <inertia ixx="0.00083861306" ixy="-9.1542325e-08" ixz="0" iyy="0.00067605212" iyz="-2.7860944e-06" izz="0.0003615168" />
-      </inertial>
+      <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+      <mass value="0.4"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 -0.03 -0.1" rpy="0 0 0"/>
+      <geometry>
+	<box size="0.05 0.03 0.15" />
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="LLEG_LINK1">
+    <inertial>
+      <origin xyz="0 0.1 0" rpy="0 0 0"/>
+      <mass value="2.5"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin rpy="0 0 1.57075" xyz="0 0 0"/>
+      <geometry>
+	<cylinder radius="0.05" length="0.1" />
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="LLEG_LINK2">
+    <inertial>
+      <origin xyz="0 0 -0.15" rpy="0 0 0"/>
+      <mass value="2"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/uarm.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <geometry>
-        <mesh filename="meshes/uarm.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="L_elbow_x" type="fixed">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 -0.23" />
-    <parent link="L_uarm" />
-    <child link="L_farm" />
-    <axis xyz="1.0 0 0.0" />
-    <limit effort="17" lower="-1.9199" upper="1.9199" velocity="0" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="L_farm">
+	<cylinder radius="0.05" length="0.1" />
+      </geometry>
+    </visual>
+
+
+  </link>
+
+  <link name="LLEG_LINK3">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.0024082691 0.00017091831 -0.14069589" />
-      <mass value="0.66002606" />
-      <inertia ixx="0.0016198862" ixy="3.700055e-06" ixz="0.00013980511" iyy="0.0016516658" iyz="2.349341e-06" izz="0.00054139396" />
-      </inertial>
+      <origin xyz="0 0.04 0" rpy="0 0 0"/>
+      <mass value="5.1"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin rpy="0 0.0 0" xyz="0 0 0.22675"/>
+      <geometry>
+	<box size="0.1 0.1 0.1535" />
+      </geometry>
+    </visual>
+
+    <visual>
+      <origin rpy="1.5708 0.0 0" xyz="0 0 0.1"/>
+      <geometry>
+	<cylinder radius="0.05" length="0.1" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="LLEG_LINK4">
+    <inertial>
+      <origin xyz="0 0 -0.3" rpy="0 0 0"/>
+      <mass value="7"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin rpy="1.5708 0  0.0" xyz="0 0 0"/>
+      <geometry>
+	<cylinder radius="0.05" length="0.1" />
+      </geometry>
+    </visual>
+
+    <visual>
+      <origin rpy="0 0.0 0.0" xyz="0 0 -0.15"/>
+      <geometry>
+	<box size="0.1 0.1 0.2" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="LLEG_LINK5">
+    <inertial>
+      <origin xyz="-0.15 0 0" rpy="0 0 0"/>
+      <mass value="2.5"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/farm.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <geometry>
-        <mesh filename="meshes/farm.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_shoulder_y" type="fixed">
-    <origin rpy="0 0 0" xyz="0 -0.255 0.45" />
-    <parent link="trunk" />
-    <child link="R_clav" />
-    <axis xyz="0.0 1.0 0.0" />
-    <limit effort="60" lower="-3.1416" upper="3.1416" velocity="0" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="R_clav">
+        <cylinder length="0.1" radius="0.05"/>
+      </geometry>
+    </visual>
+
+  </link>
+
+  <!-- VRML link name="LLEG_LINK6" -->
+  <link name="l_ankle">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0012122056 0.0015095858 -9.3677479e-05" />
-      <mass value="1.1246895" />
-      <inertia ixx="0.0017070766" ixy="2.3820729e-06" ixz="-6.7619904e-06" iyy="0.0010595629" iyz="3.2352008e-07" izz="0.001122517" />
-      </inertial>
+      <origin xyz="0.28 0 -0.2" rpy="0 0 0"/>
+      <mass value="1.9"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0" />
+      <origin rpy="0.0 0.0 0.0" xyz="0.055 0 -0.06"/>
       <geometry>
-        <mesh filename="meshes/clav.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
+	<box size="0.25 0.14 0.02"/>
+      </geometry>
+    </visual>
+
+    <visual>
+      <origin rpy="0.0 1.5708 0.0 " xyz="0.1 0 0.0"/>
       <geometry>
-        <mesh filename="meshes/clav.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_shoulder_x" type="fixed">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
-    <parent link="R_clav" />
-    <child link="R_scapula" />
-    <axis xyz="1.0 0.0 0.0" />
-    <limit effort="60" lower="-3.1416" upper="0" velocity="0" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="R_scapula">
+        <cylinder length="0.1" radius="0.05"/>
+      </geometry>
+     </visual>
+
+  </link>
+
+  <link name="RLEG_LINK1">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0038106082 -0.0001642433 -0.095219061" />
-      <mass value="0.65454544" />
-      <inertia ixx="0.0011234347" ixy="-4.6391796e-06" ixz="-0.00021802428" iyy="0.0011878253" iyz="-1.8375484e-06" izz="0.00058824357" />
-      </inertial>
+      <origin xyz="0 -0.1 0" rpy="0 0 0"/>
+      <mass value="2.5"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
+      <origin rpy="0 0 1.57075" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/scap.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <geometry>
-        <mesh filename="meshes/scap.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_shoulder_z" type="fixed">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
-    <parent link="R_scapula" />
-    <child link="R_uarm" />
-    <axis xyz="0.0 0.0 1.0" />
-    <limit effort="17" lower="-3.14" upper="3.14" velocity="0" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="R_uarm">
+	<cylinder radius="0.05" length="0.1" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="RLEG_LINK2">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.0039088302 -0.00017072539 -0.22223086" />
-      <mass value="0.58244405" />
-      <inertia ixx="0.00083861306" ixy="9.1542325e-08" ixz="0" iyy="0.00067605212" iyz="2.7860944e-06" izz="0.0003615168" />
-      </inertial>
+      <origin xyz="0 0 -0.15" rpy="0 0 0"/>
+      <mass value="2"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
+      <origin rpy="0 0 1.57075" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/uarm.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
-      <geometry>
-        <mesh filename="meshes/uarm.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  <joint name="R_elbow_x" type="fixed">
-    <origin rpy="0.0 0.0 0.0" xyz="0 0 -0.23" />
-    <parent link="R_uarm" />
-    <child link="R_farm" />
-    <axis xyz="1.0 0 0.0" />
-    <limit effort="17" lower="-1.9199" upper="1.9199" velocity="0" />
-    <dynamics damping="0" friction="0" />
-    </joint>
-  <link name="R_farm">
+	<cylinder radius="0.05" length="0.1" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="RLEG_LINK3">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.0024082691 -0.00017091831 -0.14069589" />
-      <mass value="0.66002606" />
-      <inertia ixx="0.0016198862" ixy="-3.700055e-06" ixz="0.00013980511" iyy="0.0016516658" iyz="-2.349341e-06" izz="0.00054139396" />
-      </inertial>
+      <origin xyz="0 -0.04 0" rpy="0 0 0"/>
+      <mass value="5.1"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin rpy="0 0.0 0" xyz="0 0 0.22675"/>
+      <geometry>
+	<box size="0.1 0.1 0.1535" />
+      </geometry>
+    </visual>
+
+    <visual>
+      <origin rpy="1.5708 0.0 0" xyz="0 0 0.1"/>
+      <geometry>
+	<cylinder radius="0.05" length="0.1" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="RLEG_LINK4">
+    <inertial>
+      <origin xyz="0 0 -0.3" rpy="0 0 0"/>
+      <mass value="7"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin rpy="1.5708 0  0.0" xyz="0 0 0"/>
+      <geometry>
+	<cylinder radius="0.05" length="0.1" />
+      </geometry>
+    </visual>
+
+    <visual>
+      <origin rpy="0 0.0 0.0" xyz="0 0 -0.15"/>
+      <geometry>
+	<box size="0.1 0.1 0.2" />
+      </geometry>
+    </visual>
+
+  </link>
+
+  <link name="RLEG_LINK5">
+    <inertial>
+      <origin xyz="-0.15 0 0" rpy="0 0 0"/>
+      <mass value="2.5"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
     <visual>
       <geometry>
-        <mesh filename="meshes/farm.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </visual>
-    <collision>
+        <cylinder length="0.1" radius="0.05"/>
+      </geometry>
+    </visual>
+
+  </link>
+
+  <!-- VRML link name="RLEG_LINK6" -->
+  <link name="r_ankle">
+    <inertial>
+      <origin xyz="0.28 0 -0.2" rpy="0 0 0"/>
+      <mass value="1.9"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1" />
+    </inertial>
+
+    <visual>
+      <origin rpy="0.0 0.0 0.0" xyz="0.055 0 -0.06"/>
       <geometry>
-        <mesh filename="meshes/farm.stl" scale="1e-3 1e-3 1e-3" />
-        </geometry>
-      </collision>
-    </link>
-  </robot>
+	<box size="0.25 0.14 0.02"/>
+      </geometry>
+    </visual>
+
+     <visual>
+      <origin rpy="0 1.5708 0.0 " xyz="0.1 0 0.0"/>
+      <geometry>
+        <cylinder length="0.1" radius="0.05"/>
+      </geometry>
+     </visual>
+
+  </link>
+
+
+
+  <!--   Joints following below -->
+
+  <joint name="waist" type="fixed">
+    <parent link="base_link"/>
+    <child link="BODY"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="RLEG_HIP_R" type="revolute">
+    <origin xyz="0 -0.09 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="BODY"/>
+    <child link="RLEG_LINK1"/>
+    <limit effort="100" lower="-0.349065850399" upper="1.57079632679" velocity="3.87" />
+  </joint>
+
+  <joint name="RLEG_HIP_P" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="RLEG_LINK1"/>
+    <child link="RLEG_LINK2"/>
+    <limit  effort="160" lower="-0.5236" upper="0.5236" velocity="5.8"/>
+  </joint>
+
+  <joint name="RLEG_HIP_Y" type="revolute">
+    <origin xyz="0 0 -0.3535" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <parent link="RLEG_LINK2"/>
+    <child link="RLEG_LINK3"/>
+    <limit effort="160" lower="-2.095" upper="0.7" velocity="5.8"/>
+  </joint>
+
+  <joint name="RLEG_KNEE" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="RLEG_LINK3"/>
+    <child link="RLEG_LINK4"/>
+    <limit effort="300" lower="0" upper="2.618" velocity="7"/>
+  </joint>
+
+  <joint name="RLEG_ANKLE_P" type="revolute">
+    <origin xyz="0 0 -0.3" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="RLEG_LINK4"/>
+    <child link="RLEG_LINK5"/>
+    <limit effort="30" lower="0" upper="2.618" velocity="5.8" />
+  </joint>
+
+  <joint name="RLEG_ANKLE_R" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="RLEG_LINK5"/>
+    <child link="r_ankle"/>
+    <limit effort="160" lower="-1.27" upper="0.68" velocity="5.8"/>
+  </joint>
+
+  <joint name="RARM_SHOULDER_P" type="revolute">
+    <origin xyz="0 -0.21 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="torso"/>
+    <child link="RARM_LINK1"/>
+    <limit effort="100.0" lower="-1.57079632679" upper="0.785398163397" velocity="2.7"/>
+  </joint>
+
+  <joint name="RARM_SHOULDER_R" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="RARM_LINK1"/>
+    <child link="RARM_LINK2"/>
+    <limit effort="100.0" lower="0.00872664625997" upper="2.87106661953" velocity="3.66"/>
+  </joint>
+
+  <joint name="RARM_SHOULDER_Y" type="revolute">
+    <origin xyz="0 0 -0.263" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <parent link="RARM_LINK2"/>
+    <child link="RARM_LINK3"/>
+    <limit effort="70.0" lower="-2.42600766027" upper="2.42600766027" velocity="4.58"/>
+  </joint>
+
+  <joint name="RARM_ELBOW" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="RARM_LINK3"/>
+    <child link="RARM_LINK4"/>
+    <limit effort="70.0" lower="-2.23402144255" upper="0.00349065850399" velocity="4.58"/>
+  </joint>
+
+  <joint name="RARM_WRIST_Y" type="revolute">
+    <origin xyz="0 0 -0.247" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <parent link="RARM_LINK4"/>
+    <child link="RARM_LINK5"/>
+    <limit effort="20.0" lower="-2.51327412287" upper="2.51327412287" velocity="1.95"/>
+  </joint>
+
+  <joint name="RARM_WRIST_P" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="RARM_LINK5"/>
+    <child link="RARM_LINK6"/>
+    <limit effort="8.0" lower="-1.37008346282" upper="1.37008346282" velocity="1.76"/>
+  </joint>
+
+  <joint name="RARM_WRIST_R" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="RARM_LINK6"/>
+    <child link="r_wrist"/>
+    <limit effort="8.0" lower="-0.680678408278" upper="0.680678408278" velocity="1.76"/>
+  </joint>
+
+  <joint name="LLEG_HIP_R" type="revolute">
+    <origin xyz="0 0.09 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="BODY"/>
+    <child link="LLEG_LINK1"/>
+    <limit effort="100" lower="-0.349065850399" upper="1.57079632679" velocity="3.87"/>
+  </joint>
+
+  <joint name="LLEG_HIP_P" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="LLEG_LINK1"/>
+    <child link="LLEG_LINK2"/>
+    <limit effort="100" lower="-0.349065850399" upper="1.57079632679" velocity="3.87"/>
+  </joint>
+
+  <joint name="LLEG_HIP_Y" type="revolute">
+    <origin xyz="0 0 -0.3535" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <parent link="LLEG_LINK2"/>
+    <child link="LLEG_LINK3"/>
+    <limit effort="160" lower="-0.5236" upper="0.5236" velocity="5.8"/>
+  </joint>
+
+  <joint name="LLEG_KNEE" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="LLEG_LINK3"/>
+    <child link="LLEG_LINK4"/>
+    <limit effort="160" lower="-2.095" upper="0.7" velocity="5.8"/>
+  </joint>
+
+  <joint name="LLEG_ANKLE_P" type="revolute">
+    <origin xyz="0 0 -0.3" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="LLEG_LINK4"/>
+    <child link="LLEG_LINK5"/>
+    <limit effort="300" lower="0" upper="2.618" velocity="7"/>
+  </joint>
+
+  <joint name="LLEG_ANKLE_R" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="LLEG_LINK5"/>
+    <child link="l_ankle"/>
+    <limit effort="160" lower="-1.27" upper="0.68" velocity="5.8"/>
+  </joint>
+
+  <joint name="LARM_SHOULDER_P" type="revolute">
+    <origin xyz="0 0.21 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="torso"/>
+    <child link="LARM_LINK1"/>
+    <limit effort="100.0" lower="-1.57079632679" upper="0.785398163397" velocity="2.7"/>
+  </joint>
+
+  <joint name="LARM_SHOULDER_R" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="LARM_LINK1"/>
+    <child link="LARM_LINK2"/>
+    <limit effort="100.0" lower="0.00872664625997" upper="2.87106661953" velocity="3.66"/>
+  </joint>
+
+  <joint name="LARM_SHOULDER_Y" type="revolute">
+    <origin xyz="0 0 -0.263" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <parent link="LARM_LINK2"/>
+    <child link="LARM_LINK3"/>
+    <limit effort="100.0" lower="-1.57079632679" upper="0.785398163397" velocity="2.7"/>
+  </joint>
+
+  <joint name="LARM_ELBOW" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="LARM_LINK3"/>
+    <child link="LARM_LINK4"/>
+    <limit effort="70.0" lower="-2.42600766027" upper="2.42600766027" velocity="4.58"/>
+  </joint>
+
+  <joint name="LARM_WRIST_Y" type="revolute">
+    <origin xyz="0 0 -0.247" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <parent link="LARM_LINK4"/>
+    <child link="LARM_LINK5"/>
+    <limit effort="70.0" lower="-2.23402144255" upper="0.00349065850399" velocity="4.58"/>
+  </joint>
+
+  <joint name="LARM_WRIST_P" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="LARM_LINK5"/>
+    <child link="LARM_LINK6"/>
+    <limit effort="20.0" lower="-2.51327412287" upper="2.51327412287" velocity="1.95"/>
+  </joint>
+
+  <joint name="LARM_WRIST_R" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="LARM_LINK6"/>
+    <child link="l_wrist"/>
+    <limit effort="8.0" lower="-1.37008346282" upper="1.37008346282" velocity="1.76"/>
+  </joint>
+
+  <joint name="WAIST_P" type="revolute">
+    <origin xyz="0 0 0.176" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="BODY"/>
+    <child link="WAIST_LINK1"/>
+    <limit effort="30" lower="-1.27" upper="1.27" velocity="1.76" />
+  </joint>
+
+  <joint name="WAIST_R" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="WAIST_LINK1"/>
+    <child link="WAIST_LINK2"/>
+    <limit effort="30" lower="-1.27" upper="1.27" velocity="1.76" />
+  </joint>
+
+  <joint name="CHEST" type="revolute">
+    <origin xyz="0 0 0.35" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <parent link="WAIST_LINK2"/>
+    <child link="torso"/>
+    <limit effort="30" lower="-1.27" upper="1.27" velocity="1.76" />
+  </joint>
+
+</robot>

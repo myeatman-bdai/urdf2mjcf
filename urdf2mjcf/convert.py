@@ -1,37 +1,220 @@
-"""Uses Mujoco to convert from URDF to MJCF files."""
+"""Converts URDF files to MJCF files."""
 
 import argparse
+import json
+import logging
+import math
 import shutil
-import tempfile
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
 
-import mujoco
+import colorlogging
+from pydantic import BaseModel
 
-from urdf2mjcf.utils import iter_meshes, save_xml
+from urdf2mjcf.utils import save_xml
+
+logger = logging.getLogger(__name__)
+
+
+class JointParam(BaseModel):
+    kp: float = 0.0
+    kd: float = 0.0
+
+    class Config:
+        extra = "forbid"
+
+
+class JointParamsMetadata(BaseModel):
+    pd_params: dict[str, JointParam] = {}
+    default_kp: float = 0.0
+    default_kd: float = 0.0
+
+    class Config:
+        extra = "forbid"
+
+
+@dataclass
+class ParsedJointParams:
+    """Parsed joint parameters from URDF.
+
+    Attributes:
+        name: Joint name.
+        type: Joint type (hinge, slide, etc.).
+        stiffness: Joint stiffness (kp).
+        damping: Joint damping (kd).
+        lower: Lower joint limit, if any.
+        upper: Upper joint limit, if any.
+    """
+
+    name: str
+    type: str
+    stiffness: float
+    damping: float
+    lower: float | None = None
+    upper: float | None = None
+
+
+@dataclass
+class GeomElement:
+    type: str
+    size: str | None = None
+    scale: str | None = None
+    mesh: str | None = None
+
+
+def parse_vector(s: str) -> list[float]:
+    """Convert a string of space-separated numbers to a list of floats.
+
+    Args:
+        s: Space-separated string of numbers (e.g., "1 2 3").
+
+    Returns:
+        List of parsed float values.
+    """
+    return list(map(float, s.split()))
+
+
+def quat_from_str(s: str) -> list[float]:
+    """Convert a quaternion string to a list of floats.
+
+    Args:
+        s: Space-separated string of quaternion values (w x y z).
+
+    Returns:
+        List of parsed quaternion values [w, x, y, z].
+    """
+    return list(map(float, s.split()))
+
+
+def quat_to_rot(q: list[float]) -> list[list[float]]:
+    """Convert quaternion [w, x, y, z] to a 3x3 rotation matrix."""
+    w, x, y, z = q
+    r00 = 1 - 2 * (y * y + z * z)
+    r01 = 2 * (x * y - z * w)
+    r02 = 2 * (x * z + y * w)
+    r10 = 2 * (x * y + z * w)
+    r11 = 1 - 2 * (x * x + z * z)
+    r12 = 2 * (y * z - x * w)
+    r20 = 2 * (x * z - y * w)
+    r21 = 2 * (y * z + x * w)
+    r22 = 1 - 2 * (x * x + y * y)
+    return [[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]]
+
+
+def build_transform(pos_str: str, quat_str: str) -> list[list[float]]:
+    """Build a 4x4 homogeneous transformation matrix from position and quaternion strings.
+
+    Args:
+        pos_str: Space-separated string of position values (x y z).
+        quat_str: Space-separated string of quaternion values (w x y z).
+
+    Returns:
+        A 4x4 homogeneous transformation matrix.
+    """
+    pos = parse_vector(pos_str)
+    q = quat_from_str(quat_str)
+    r_mat = quat_to_rot(q)
+    transform = [
+        [r_mat[0][0], r_mat[0][1], r_mat[0][2], pos[0]],
+        [r_mat[1][0], r_mat[1][1], r_mat[1][2], pos[1]],
+        [r_mat[2][0], r_mat[2][1], r_mat[2][2], pos[2]],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+    return transform
+
+
+def mat_mult(mat_a: list[list[float]], mat_b: list[list[float]]) -> list[list[float]]:
+    """Multiply two 4x4 matrices A and B."""
+    result = [[0.0] * 4 for _ in range(4)]
+    for i in range(4):
+        for j in range(4):
+            result[i][j] = sum(mat_a[i][k] * mat_b[k][j] for k in range(4))
+    return result
+
+
+DEFAULT_FOOT_MESH_BOTTOM_OFFSET: float = 0.05
+
+
+def compute_min_z(body: ET.Element, parent_transform: list[list[float]]) -> float:
+    """Recursively computes the minimum Z value in the world frame.
+
+    This is used to compute the starting height of the robot.
+
+    Args:
+        body: The current body element.
+        parent_transform: The transform of the parent body.
+
+    Returns:
+        The minimum Z value in the world frame.
+    """
+    pos_str: str = body.attrib.get("pos", "0 0 0")
+    quat_str: str = body.attrib.get("quat", "1 0 0 0")
+    body_tf: list[list[float]] = mat_mult(parent_transform, build_transform(pos_str, quat_str))
+    local_min_z: float = float("inf")
+
+    for child in body:
+        if child.tag == "geom":
+            gpos_str: str = child.attrib.get("pos", "0 0 0")
+            gquat_str: str = child.attrib.get("quat", "1 0 0 0")
+            geom_tf: list[list[float]] = build_transform(gpos_str, gquat_str)
+            total_tf: list[list[float]] = mat_mult(body_tf, geom_tf)
+
+            # The translation part of T_total is in column 3.
+            z: float = total_tf[2][3]
+            geom_type: str = child.attrib.get("type", "")
+            if geom_type == "box":
+                size_vals: list[float] = list(map(float, child.attrib.get("size", "0 0 0").split()))
+                half_height: float = size_vals[2] if len(size_vals) >= 3 else 0.0
+                candidate: float = z - half_height
+            elif geom_type == "cylinder":
+                size_vals = list(map(float, child.attrib.get("size", "0 0").split()))
+                half_length: float = size_vals[1] if len(size_vals) >= 2 else 0.0
+                candidate = z - half_length
+            elif geom_type == "sphere":
+                r = float(child.attrib.get("size", "0"))
+                candidate = z - r
+            elif geom_type == "mesh":
+                body_name: str = body.attrib.get("name", "").lower()
+                extra: float = DEFAULT_FOOT_MESH_BOTTOM_OFFSET if "foot" in body_name else 0.0
+                candidate = z - extra
+            else:
+                candidate = z
+
+            local_min_z = min(candidate, local_min_z)
+
+        elif child.tag == "body":
+            child_min: float = compute_min_z(child, body_tf)
+            local_min_z = min(child_min, local_min_z)
+
+    return local_min_z
 
 
 def add_compiler(root: ET.Element) -> None:
-    element = ET.Element(
-        "compiler",
-        attrib={
-            "angle": "radian",
-            "meshdir": "meshes",
-            "eulerseq": "zyx",
-            "autolimits": "true",
-        },
-    )
+    """Add a compiler element to the MJCF root.
 
-    if isinstance(existing_element := root.find("compiler"), ET.Element):
+    Args:
+        root: The MJCF root element.
+        timestep: Optional control timestep in seconds. If specified, sets the simulation
+                 timestep for the PD controller.
+    """
+    attrib = {
+        "angle": "radian",
+        "meshdir": "meshes",
+        "eulerseq": "zyx",
+        "autolimits": "true",
+    }
+
+    element = ET.Element("compiler", attrib=attrib)
+    existing_element = root.find("compiler")
+    if isinstance(existing_element, ET.Element):
         root.remove(existing_element)
     root.insert(0, element)
 
 
 def add_default(root: ET.Element) -> None:
+    """Add default settings for joints, geoms, motors, and equality constraints."""
     default = ET.Element("default")
-
-    # Adds default joint options.
     ET.SubElement(
         default,
         "joint",
@@ -42,8 +225,6 @@ def add_default(root: ET.Element) -> None:
             "frictionloss": "0.01",
         },
     )
-
-    # Adds default geom options.
     ET.SubElement(
         default,
         "geom",
@@ -55,22 +236,16 @@ def add_default(root: ET.Element) -> None:
             "solref": "0.001 2",
         },
     )
-
-    # Adds default motor options.
     ET.SubElement(
         default,
         "motor",
         attrib={"ctrllimited": "true"},
     )
-
-    # Adds default equality options.
     ET.SubElement(
         default,
         "equality",
         attrib={"solref": "0.001 2"},
     )
-
-    # Adds default visualgeom options.
     default_element = ET.SubElement(
         default,
         "default",
@@ -81,34 +256,22 @@ def add_default(root: ET.Element) -> None:
         "geom",
         attrib={"material": "visualgeom", "condim": "1", "contype": "0", "conaffinity": "0"},
     )
-
-    if isinstance(existing_element := root.find("default"), ET.Element):
+    existing_element = root.find("default")
+    if isinstance(existing_element, ET.Element):
         root.remove(existing_element)
     root.insert(0, default)
 
 
-def add_option(root: ET.Element) -> None:
-    element = ET.Element(
-        "option",
-        attrib={
-            "iterations": "50",
-            "timestep": "0.001",
-            "solver": "PGS",
-            "gravity": "0 0 -9.81",
-        },
-    )
+def add_assets(root: ET.Element, materials: dict[str, str]) -> None:
+    """Add texture and material assets to the MJCF root.
 
-    if isinstance(existing_element := root.find("option"), ET.Element):
-        root.remove(existing_element)
-    root.insert(0, element)
-
-
-def add_assets(root: ET.Element) -> None:
+    Args:
+        root: The MJCF root element.
+        materials: Dictionary mapping material names to RGBA color strings.
+    """
     asset = root.find("asset")
     if asset is None:
         asset = ET.SubElement(root, "asset")
-
-    # Add textures and materials
     ET.SubElement(
         asset,
         "texture",
@@ -133,64 +296,36 @@ def add_assets(root: ET.Element) -> None:
             "texuniform": "true",
         },
     )
+
+    # Add materials from URDF
+    for name, rgba in materials.items():
+        ET.SubElement(
+            asset,
+            "material",
+            attrib={
+                "name": name,
+                "rgba": rgba,
+            },
+        )
+
+    # Add default material for visual elements without materials
     ET.SubElement(
         asset,
         "material",
         attrib={
-            "name": "visualgeom",
-            "rgba": "0.5 0.9 0.2 1",
+            "name": "default_material",
+            "rgba": "0.7 0.7 0.7 1",
         },
     )
-
-
-def add_root_body(root: ET.Element, foot_distance: float) -> None:
-    worldbody = root.find("worldbody")
-    if worldbody is None:
-        worldbody = ET.SubElement(root, "worldbody")
-
-    # Create a root body
-    root_body = ET.Element(
-        "body",
-        attrib={
-            "name": "root",
-            "pos": f"0 0 {foot_distance}",  # Set the initial height
-            "quat": "1 0 0 0",
-        },
-    )
-
-    # Add a freejoint
-    ET.SubElement(
-        root_body,
-        "freejoint",
-        attrib={"name": "root"},
-    )
-
-    # Add imu site
-    ET.SubElement(
-        root_body,
-        "site",
-        attrib={
-            "name": "imu",
-            "size": "0.01",
-            "pos": "0 0 0",
-        },
-    )
-
-    # Move existing bodies and geoms under root_body
-    elements_to_move = list(worldbody)
-    for elem in elements_to_move:
-        if elem.tag in {"body", "geom"}:
-            worldbody.remove(elem)
-            root_body.append(elem)
-    worldbody.append(root_body)
 
 
 def add_worldbody_elements(root: ET.Element) -> None:
+    """Add the ground plane and lights to the worldbody element."""
     worldbody = root.find("worldbody")
     if worldbody is None:
         worldbody = ET.SubElement(root, "worldbody")
 
-    # Add ground plane
+    # Add ground plane.
     worldbody.insert(
         0,
         ET.Element(
@@ -198,8 +333,8 @@ def add_worldbody_elements(root: ET.Element) -> None:
             attrib={
                 "name": "ground",
                 "type": "plane",
-                "pos": "0 0 0",  # Changed to "0 0 0"
-                "size": "100 100 0.001",
+                "pos": "0 0 0",
+                "size": "10 10 0.001",
                 "quat": "1 0 0 0",
                 "material": "matplane",
                 "condim": "3",
@@ -208,7 +343,7 @@ def add_worldbody_elements(root: ET.Element) -> None:
         ),
     )
 
-    # Add lights
+    # Add lights.
     worldbody.insert(
         0,
         ET.Element(
@@ -238,319 +373,476 @@ def add_worldbody_elements(root: ET.Element) -> None:
     )
 
 
-def add_actuators(root: ET.Element, no_frc_limit: bool = False) -> None:
-    actuator_element = ET.Element("actuator")
-
-    # For each joint, add a motor actuator
-    for joint in root.iter("joint"):
-        joint_name = joint.attrib.get("name")
-        if joint_name is None:
-            continue
-
-        # Get joint limits if present
-        limit_element = joint.find("limit")
-        lower_limit = limit_element.get("lower") if limit_element is not None else None
-        upper_limit = limit_element.get("upper") if limit_element is not None else None
-
-        if no_frc_limit:
-            ctrlrange = "-200 200"
-        elif lower_limit is not None and upper_limit is not None:
-            ctrlrange = f"{lower_limit} {upper_limit}"
-        else:
-            actuatorfrcrange = joint.attrib.get("actuatorfrcrange")
-            ctrlrange = actuatorfrcrange if actuatorfrcrange is not None else "-1 1"
-
-        ET.SubElement(
-            actuator_element,
-            "motor",
-            attrib={
-                "name": joint_name,
-                "joint": joint_name,
-                "ctrllimited": "true",
-                "ctrlrange": ctrlrange,
-                "gear": "1",
-            },
-        )
-
-    if isinstance(existing_element := root.find("actuator"), ET.Element):
-        root.remove(existing_element)
-    root.append(actuator_element)
-
-
-def add_sensors(root: ET.Element) -> None:
-    sensor_element = ET.Element("sensor")
-
-    # For each actuator, add sensors
-    actuators = root.find("actuator")
-    if actuators is not None:
-        for actuator in actuators.iter("motor"):
-            actuator_name = actuator.attrib.get("name")
-            if actuator_name is None:
-                continue
-
-            # Add actuatorpos sensor
-            ET.SubElement(
-                sensor_element,
-                "actuatorpos",
-                attrib={
-                    "name": f"{actuator_name}_p",
-                    "actuator": actuator_name,
-                },
-            )
-
-            # Add actuatorvel sensor
-            ET.SubElement(
-                sensor_element,
-                "actuatorvel",
-                attrib={
-                    "name": f"{actuator_name}_v",
-                    "actuator": actuator_name,
-                },
-            )
-
-            # Add actuatorfrc sensor
-            ET.SubElement(
-                sensor_element,
-                "actuatorfrc",
-                attrib={
-                    "name": f"{actuator_name}_f",
-                    "actuator": actuator_name,
-                    "noise": "0.001",
-                },
-            )
-
-    # Add additional sensors
-    imu_site = None
-    for site in root.iter("site"):
-        if site.attrib.get("name") == "imu":
-            imu_site = site
-            break
-
-    if imu_site is not None:
-        # Add framequat sensor
-        ET.SubElement(
-            sensor_element,
-            "framequat",
-            attrib={
-                "name": "orientation",
-                "objtype": "site",
-                "noise": "0.001",
-                "objname": "imu",
-            },
-        )
-
-        # Add gyro sensor
-        ET.SubElement(
-            sensor_element,
-            "gyro",
-            attrib={
-                "name": "angular-velocity",
-                "site": "imu",
-                "noise": "0.005",
-                "cutoff": "34.9",
-            },
-        )
-
-    if isinstance(existing_element := root.find("sensor"), ET.Element):
-        root.remove(existing_element)
-    root.append(sensor_element)
-
-
-def add_cameras(root: ET.Element, foot_distance: float, distance: float = 3.0, height_offset: float = 0.5) -> None:
-    worldbody = root.find("worldbody")
-    if worldbody is None:
-        return
-
-    camera_height = foot_distance + height_offset
-
-    # Add a fixed camera
-    ET.SubElement(
-        worldbody,
-        "camera",
-        attrib={
-            "name": "fixed",
-            "pos": f"0 {-distance} {camera_height}",
-            "xyaxes": "1 0 0 0 0 1",
-        },
-    )
-
-    # Add a tracking camera
-    ET.SubElement(
-        worldbody,
-        "camera",
-        attrib={
-            "name": "track",
-            "mode": "trackcom",
-            "pos": f"0 {-distance} {camera_height}",
-            "xyaxes": "1 0 0 0 0 1",
-        },
-    )
-
-
-def add_visual_geom_logic(root: ET.Element) -> None:
-    """Add visual geom logic to the root element.
-
-    Args:
-        root: The root element of the MJCF file.
-    """
-    for body in root.findall(".//body"):
-        original_geoms = list(body.findall("geom"))
-        for geom in original_geoms:
-            geom.set("class", "visualgeom")
-            # Create a new geom element
-            new_geom = ET.Element("geom")
-            new_geom.set("type", geom.get("type") or "")
-            new_geom.set("rgba", geom.get("rgba") or "")
-
-            # Check if geom has mesh or is a box
-            if geom.get("mesh") is None:
-                if geom.get("type") == "box":
-                    new_geom.set("type", "box")
-                    new_geom.set("size", geom.get("size") or "")
-            else:
-                new_geom.set("mesh", geom.get("mesh") or "")
-            if geom.get("pos"):
-                new_geom.set("pos", geom.get("pos") or "")
-            if geom.get("quat"):
-                new_geom.set("quat", geom.get("quat") or "")
-
-            # Append the new geom to the body
-            index = list(body).index(geom)
-            body.insert(index + 1, new_geom)
+def rpy_to_quat(rpy_str: str) -> str:
+    """Convert roll, pitch, yaw angles (in radians) to a quaternion (w, x, y, z)."""
+    try:
+        r, p, y = map(float, rpy_str.split())
+    except Exception:
+        r, p, y = 0.0, 0.0, 0.0
+    cy = math.cos(y * 0.5)
+    sy = math.sin(y * 0.5)
+    cp = math.cos(p * 0.5)
+    sp = math.sin(p * 0.5)
+    cr = math.cos(r * 0.5)
+    sr = math.sin(r * 0.5)
+    qw = cr * cp * cy + sr * sp * sy
+    qx = sr * cp * cy - cr * sp * sy
+    qy = cr * sp * cy + sr * cp * sy
+    qz = cr * cp * sy - sr * sp * cy
+    return f"{qw} {qx} {qy} {qz}"
 
 
 def convert_urdf_to_mjcf(
-    urdf_path: Union[str, Path],
-    mjcf_path: Union[str, Path, None] = None,
-    no_collision_mesh: bool = False,
+    urdf_path: str | Path,
+    mjcf_path: str | Path | None = None,
     copy_meshes: bool = False,
-    camera_distance: float = 3.0,
-    camera_height_offset: float = 0.5,
-    no_frc_limit: bool = False,
+    joint_params_metadata: JointParamsMetadata | None = None,
 ) -> None:
-    """Convert a URDF file to an MJCF file.
+    """Converts a URDF file to an MJCF file.
 
     Args:
         urdf_path: The path to the URDF file.
-        mjcf_path: The path to the MJCF file. If not provided, use the URDF
-            path with the extension replaced with ".xml".
-        no_collision_mesh: Do not include collision meshes.
-        copy_meshes: Copy mesh files to the output MJCF directory if different
-            from URDF directory.
-        camera_distance: Distance of the fixed camera from the robot.
-        camera_height_offset: Height offset of the fixed camera from the robot.
-        no_frc_limit: Do not include force limit for the actuators.
+        mjcf_path: The desired output MJCF file path. If None, the URDF path
+            with an ".xml" extension is used.
+        copy_meshes: If True, mesh files will be copied to the MJCF meshes
+            directory.
+        joint_params_metadata: Optional PD gains metadata for joints.
     """
     urdf_path = Path(urdf_path)
     mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".xml")
-    if not Path(urdf_path).exists():
+    if not urdf_path.exists():
         raise FileNotFoundError(f"URDF file not found: {urdf_path}")
     mjcf_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_dir_path = Path(temp_dir)
+    if joint_params_metadata is None:
+        joint_params_metadata = JointParamsMetadata()
 
-        # Copy URDF file to temp directory
-        urdf_dir = urdf_path.parent.resolve()
-        temp_urdf_path = temp_dir_path / urdf_path.name
-        temp_urdf_path.write_bytes(urdf_path.read_bytes())
+    # Parse the URDF file.
+    urdf_tree: ET.ElementTree = ET.parse(urdf_path)
+    robot: ET.Element = urdf_tree.getroot()
 
-        # Copy mesh files to temp directory and potentially to output directory
-        mesh_files = []
-        for (_, visual_mesh_path), (_, collision_mesh_path) in iter_meshes(urdf_path):
-            for mesh_path in list({visual_mesh_path, collision_mesh_path}):
-                if mesh_path is not None:
-                    temp_mesh_path = temp_dir_path / mesh_path.name
-                    try:
-                        temp_mesh_path.symlink_to(mesh_path)
-                        mesh_files.append(mesh_path.relative_to(urdf_dir))
-                    except FileExistsError:
-                        pass
+    # Parse materials from URDF - both from root level and from link visuals
+    materials: dict[str, str] = {}
 
-        urdf_tree = ET.parse(temp_urdf_path)
-        for mesh in urdf_tree.iter("mesh"):
-            full_filename = mesh.attrib.get("filename")
-            if full_filename is not None:
-                mesh.attrib["filename"] = Path(full_filename).name
+    # Get materials defined at the robot root level
+    for material in robot.findall("material"):
+        name = material.attrib.get("name")
+        if name is None:
+            continue
+        color = material.find("color")
+        if color is not None:
+            rgba = color.attrib.get("rgba")
+            if rgba is not None:
+                materials[name] = rgba
 
-        # Load the URDF file with Mujoco and save it as an MJCF file in the temp directory
-        temp_mjcf_path = temp_dir_path / mjcf_path.name
+    # Get materials defined in link visual elements
+    for link in robot.findall("link"):
+        for visual in link.findall("visual"):
+            visual_material = visual.find("material")
+            if visual_material is None:
+                continue
+            name = visual_material.attrib.get("name")
+            if name is None:
+                continue
+            color = visual_material.find("color")
+            if color is not None:
+                rgba = color.attrib.get("rgba")
+                if rgba is not None:
+                    materials[name] = rgba
 
-        # Get the distance to the lowest point on the robot, to offset the root body.
-        model = mujoco.MjModel.from_xml_path(temp_urdf_path.as_posix())
-        data = mujoco.MjData(model)
-        mujoco.mj_fwdPosition(model, data)
-        foot_distance = -(data.geom_xpos[:, 2] - model.geom_size[:, 2]).min()
+    # Create a new MJCF tree root element.
+    mjcf_root: ET.Element = ET.Element("mujoco", attrib={"model": robot.attrib.get("name", "converted_robot")})
 
-        mujoco.mj_saveLastXML(temp_mjcf_path.as_posix(), model)
+    # Add compiler, assets, and default settings.
+    add_compiler(mjcf_root)
+    add_assets(mjcf_root, materials)
+    add_default(mjcf_root)
 
-        # Read the MJCF file and update the paths to the meshes
-        mjcf_tree = ET.parse(temp_mjcf_path)
-        root = mjcf_tree.getroot()
+    # Create or find the worldbody element.
+    worldbody: ET.Element | None = mjcf_root.find("worldbody")
+    if worldbody is None:
+        worldbody = ET.SubElement(mjcf_root, "worldbody")
 
-        for asset in mjcf_tree.iter("asset"):
-            for mesh in asset.iter("mesh"):
-                mesh_name = Path(mesh.attrib["file"]).name
-                # Update the file attribute to just the mesh name
-                mesh.attrib["file"] = mesh_name
+    # Build mappings for URDF links and joints.
+    link_map: dict[str, ET.Element] = {link.attrib["name"]: link for link in robot.findall("link")}
+    parent_map: dict[str, list[tuple[str, ET.Element]]] = {}
+    child_joints: dict[str, ET.Element] = {}
+    for joint in robot.findall("joint"):
+        parent_elem = joint.find("parent")
+        child_elem = joint.find("child")
+        if parent_elem is None or child_elem is None:
+            logger.warning("Joint missing parent or child element")
+            continue
+        parent_name = parent_elem.attrib.get("link", "")
+        child_name = child_elem.attrib.get("link", "")
+        if not parent_name or not child_name:
+            logger.warning("Joint missing parent or child link name")
+            continue
+        parent_map.setdefault(parent_name, []).append((child_name, joint))
+        child_joints[child_name] = joint
 
-        if no_frc_limit:
-            for joint in root.iter("joint"):
-                if "actuatorfrcrange" in joint.attrib:
-                    del joint.attrib["actuatorfrcrange"]
+    all_links = set(link_map.keys())
+    child_links = set(child_joints.keys())
+    root_links: list[str] = list(all_links - child_links)
+    if not root_links:
+        raise ValueError("No root link found in URDF.")
+    root_link_name: str = root_links[0]
 
-        # Turn off internal collisions
-        if not no_collision_mesh:
-            for geom in root.iter("geom"):
-                geom.attrib["contype"] = str(1)
-                geom.attrib["conaffinity"] = str(0)
-                geom.attrib["density"] = str(0)
-                geom.attrib["group"] = str(1)
+    # These dictionaries are used to collect mesh assets and actuator joints.
+    mesh_assets: dict[str, str] = {}
+    actuator_joints: list[ParsedJointParams] = []
 
-        # Manually set additional options.
-        add_default(root)
-        add_compiler(root)
-        add_option(root)
-        add_assets(root)
-        add_cameras(root, foot_distance, distance=camera_distance, height_offset=camera_height_offset)
-        add_root_body(root, foot_distance)
-        add_worldbody_elements(root)
-        add_actuators(root, no_frc_limit)
-        add_sensors(root)
-        add_visual_geom_logic(root)
+    def handle_geom_element(geom_elem: ET.Element | None, default_size: str) -> GeomElement:
+        """Helper to handle geometry elements safely.
 
-        # Copy mesh files to the output directory.
-        if copy_meshes:
-            for mesh_file in mesh_files:
-                mjcf_mesh_path = mjcf_path.parent.resolve() / mesh_file
-                mjcf_mesh_path.parent.mkdir(parents=True, exist_ok=True)
-                urdf_mesh_path = urdf_dir / mesh_file
-                if mjcf_mesh_path != urdf_mesh_path:
-                    shutil.copy2(urdf_mesh_path, mjcf_mesh_path)
+        Args:
+            geom_elem: The geometry element to process
+            default_size: Default size to use if not specified
 
-        # Write the updated MJCF file to the original destination
-        save_xml(mjcf_path, mjcf_tree)
+        Returns:
+            A GeomElement instance
+        """
+        if geom_elem is None:
+            return GeomElement(type="box", size=default_size, scale=None, mesh=None)
+
+        box_elem = geom_elem.find("box")
+        if box_elem is not None:
+            size_str = box_elem.attrib.get("size", default_size)
+            return GeomElement(
+                type="box",
+                size=" ".join(str(float(s) / 2) for s in size_str.split()),
+            )
+
+        cyl_elem = geom_elem.find("cylinder")
+        if cyl_elem is not None:
+            radius = cyl_elem.attrib.get("radius", "0.1")
+            length = cyl_elem.attrib.get("length", "1")
+            return GeomElement(
+                type="cylinder",
+                size=f"{radius} {float(length) / 2}",
+            )
+
+        sph_elem = geom_elem.find("sphere")
+        if sph_elem is not None:
+            radius = sph_elem.attrib.get("radius", "0.1")
+            return GeomElement(
+                type="sphere",
+                size=radius,
+            )
+
+        mesh_elem = geom_elem.find("mesh")
+        if mesh_elem is not None:
+            filename = mesh_elem.attrib.get("filename")
+            if filename is not None:
+                mesh_name = Path(filename).name
+                if mesh_name not in mesh_assets:
+                    mesh_assets[mesh_name] = filename
+                scale = mesh_elem.attrib.get("scale")
+                return GeomElement(
+                    type="mesh",
+                    size=None,
+                    scale=scale,
+                    mesh=mesh_name,
+                )
+
+        return GeomElement(
+            type="box",
+            size=default_size,
+        )
+
+    def build_body(
+        link_name: str,
+        joint: ET.Element | None = None,
+        actuator_joints: list[ParsedJointParams] = actuator_joints,
+    ) -> ET.Element:
+        """Recursively build a MJCF body element from a URDF link."""
+        link: ET.Element = link_map[link_name]
+
+        if joint is not None:
+            origin_elem: ET.Element | None = joint.find("origin")
+            if origin_elem is not None:
+                pos = origin_elem.attrib.get("xyz", "0 0 0")
+                rpy = origin_elem.attrib.get("rpy", "0 0 0")
+                quat = rpy_to_quat(rpy)
+            else:
+                pos = "0 0 0"
+                quat = "1 0 0 0"
+        else:
+            pos = "0 0 0"
+            quat = "1 0 0 0"
+
+        body: ET.Element = ET.Element("body", attrib={"name": link_name, "pos": pos, "quat": quat})
+
+        # Add joint element if this is not the root and the joint type is not fixed.
+        if joint is not None:
+            jtype: str = joint.attrib.get("type", "fixed")
+            if jtype != "fixed":
+                j_name: str = joint.attrib.get("name", link_name + "_joint")
+                j_attrib: dict[str, str] = {"name": j_name}
+                if jtype in ["revolute", "continuous"]:
+                    j_attrib["type"] = "hinge"
+                elif jtype == "prismatic":
+                    j_attrib["type"] = "slide"
+                else:
+                    j_attrib["type"] = jtype
+                limit = joint.find("limit")
+                if limit is not None:
+                    lower_val = limit.attrib.get("lower")
+                    upper_val = limit.attrib.get("upper")
+                    if lower_val is not None and upper_val is not None:
+                        j_attrib["range"] = f"{lower_val} {upper_val}"
+                        lower_num: float | None = float(lower_val)
+                        upper_num: float | None = float(upper_val)
+                    else:
+                        lower_num = upper_num = None
+                else:
+                    lower_num = upper_num = None
+                axis_elem = joint.find("axis")
+                if axis_elem is not None:
+                    j_attrib["axis"] = axis_elem.attrib.get("xyz", "0 0 1")
+                ET.SubElement(body, "joint", attrib=j_attrib)
+
+                # Use PD gains from the joint parameters metadata.
+                for suffix, param in joint_params_metadata.pd_params.items():
+                    if j_name.endswith(suffix):
+                        stiffness_val: float = param.kp
+                        damping_val: float = param.kd
+                        break
+                else:
+                    stiffness_val = joint_params_metadata.default_kp
+                    damping_val = joint_params_metadata.default_kd
+
+                actuator_joints.append(
+                    ParsedJointParams(
+                        name=j_name,
+                        type=j_attrib["type"],
+                        stiffness=stiffness_val,
+                        damping=damping_val,
+                        lower=lower_num,
+                        upper=upper_num,
+                    )
+                )
+
+        # Process inertial information.
+        inertial = link.find("inertial")
+        if inertial is not None:
+            inertial_elem = ET.Element("inertial")
+            origin_inertial = inertial.find("origin")
+            if origin_inertial is not None:
+                inertial_elem.attrib["pos"] = origin_inertial.attrib.get("xyz", "0 0 0")
+                rpy = origin_inertial.attrib.get("rpy", "0 0 0")
+                inertial_elem.attrib["quat"] = rpy_to_quat(rpy)
+            mass_elem = inertial.find("mass")
+            if mass_elem is not None:
+                inertial_elem.attrib["mass"] = mass_elem.attrib.get("value", "0")
+            inertia_elem = inertial.find("inertia")
+            if inertia_elem is not None:
+                ixx = float(inertia_elem.attrib.get("ixx", "0"))
+                ixy = float(inertia_elem.attrib.get("ixy", "0"))
+                ixz = float(inertia_elem.attrib.get("ixz", "0"))
+                iyy = float(inertia_elem.attrib.get("iyy", "0"))
+                iyz = float(inertia_elem.attrib.get("iyz", "0"))
+                izz = float(inertia_elem.attrib.get("izz", "0"))
+                if abs(ixy) > 1e-6 or abs(ixz) > 1e-6 or abs(iyz) > 1e-6:
+                    logger.warning(
+                        "Warning: off-diagonal inertia terms for link '%s' are nonzero and will be ignored.",
+                        link_name,
+                    )
+                inertial_elem.attrib["diaginertia"] = f"{ixx} {iyy} {izz}"
+            body.append(inertial_elem)
+
+        # Process collision geometries.
+        collisions = link.findall("collision")
+        for idx, collision in enumerate(collisions):
+            origin_collision = collision.find("origin")
+            if origin_collision is not None:
+                pos_geom: str = origin_collision.attrib.get("xyz", "0 0 0")
+                rpy_geom: str = origin_collision.attrib.get("rpy", "0 0 0")
+                quat_geom: str = rpy_to_quat(rpy_geom)
+            else:
+                pos_geom = "0 0 0"
+                quat_geom = "1 0 0 0"
+            geom_attrib: dict[str, str] = {"name": f"{link_name}_collision_{idx}", "pos": pos_geom, "quat": quat_geom}
+            geom_elem: ET.Element | None = collision.find("geometry")
+            if geom_elem is not None:
+                geom = handle_geom_element(geom_elem, "1 1 1")
+                geom_attrib["type"] = geom.type
+                if geom.type == "mesh":
+                    if geom.mesh is not None:
+                        geom_attrib["mesh"] = geom.mesh
+                elif geom.size is not None:
+                    geom_attrib["size"] = geom.size
+                if geom.scale is not None:
+                    geom_attrib["scale"] = geom.scale
+            geom_attrib["rgba"] = "0 0 0 0"
+            ET.SubElement(body, "geom", attrib=geom_attrib)
+
+        # Process visual geometries.
+        visuals = link.findall("visual")
+        for idx, visual in enumerate(visuals):
+            origin_visual = visual.find("origin")
+            if origin_visual is not None:
+                pos_geom = origin_visual.attrib.get("xyz", "0 0 0")
+                rpy_geom = origin_visual.attrib.get("rpy", "0 0 0")
+                quat_geom = rpy_to_quat(rpy_geom)
+            else:
+                pos_geom = "0 0 0"
+                quat_geom = "1 0 0 0"
+            geom_attrib = {
+                "name": f"{link_name}_visual_{idx}",
+                "pos": pos_geom,
+                "quat": quat_geom,
+            }
+
+            # Get material from visual element
+            material_elem = visual.find("material")
+            if material_elem is not None:
+                material_name = material_elem.attrib.get("name")
+                if material_name in materials:
+                    geom_attrib["material"] = material_name
+                else:
+                    geom_attrib["material"] = "default_material"
+            else:
+                geom_attrib["material"] = "default_material"
+
+            geom_elem = visual.find("geometry")
+            if geom_elem is not None:
+                geom = handle_geom_element(geom_elem, "1 1 1")
+                geom_attrib["type"] = geom.type
+                if geom.type == "mesh":
+                    if geom.mesh is not None:
+                        geom_attrib["mesh"] = geom.mesh
+                elif geom.size is not None:
+                    geom_attrib["size"] = geom.size
+                if geom.scale is not None:
+                    geom_attrib["scale"] = geom.scale
+            ET.SubElement(body, "geom", attrib=geom_attrib)
+
+        # Recurse into child links.
+        if link_name in parent_map:
+            for child_name, child_joint in parent_map[link_name]:
+                child_body = build_body(child_name, child_joint, actuator_joints)
+                body.append(child_body)
+        return body
+
+    # Build the robot body hierarchy starting from the root link.
+    robot_body: ET.Element = build_body(root_link_name, None, actuator_joints)
+
+    # Automatically compute the base offset using the model's minimum z coordinate.
+    identity: list[list[float]] = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+    min_z: float = compute_min_z(robot_body, identity)
+    computed_offset: float = -min_z
+    logger.info("Auto-detected base offset: %s (min z = %s)", computed_offset, min_z)
+
+    # Create a root body with a freejoint and an IMU site; the z position uses the computed offset.
+    root_body = ET.Element("body", attrib={"name": "root", "pos": f"0 0 {computed_offset}", "quat": "1 0 0 0"})
+    ET.SubElement(root_body, "freejoint", attrib={"name": "root"})
+    ET.SubElement(root_body, "site", attrib={"name": "imu", "size": "0.01", "pos": "0 0 0"})
+    root_body.append(robot_body)
+    worldbody.append(root_body)
+
+    # Replace the actuator block with one that uses positional control.
+    actuator_elem = ET.SubElement(mjcf_root, "actuator")
+    for joint_params in actuator_joints:
+        ctrlrange = (
+            f"{joint_params.lower} {joint_params.upper}"
+            if (joint_params.lower is not None and joint_params.upper is not None)
+            else "-1 1"
+        )
+        ET.SubElement(
+            actuator_elem,
+            "position",
+            attrib={
+                "name": f"{joint_params.name}_ctrl",
+                "joint": joint_params.name,
+                "kp": f"{joint_params.stiffness:.8f}",
+                "kv": f"{joint_params.damping:.8f}",
+                "ctrlrange": ctrlrange,
+            },
+        )
+
+    # Add additional worldbody elements (ground, lights, etc.).
+    add_worldbody_elements(mjcf_root)
+
+    # Add mesh assets to the asset section.
+    asset_elem: ET.Element | None = mjcf_root.find("asset")
+    if asset_elem is None:
+        asset_elem = ET.SubElement(mjcf_root, "asset")
+    for mesh_name, filename in mesh_assets.items():
+        ET.SubElement(asset_elem, "mesh", attrib={"name": mesh_name, "file": Path(filename).name})
+
+    # Copy mesh files if requested.
+    if copy_meshes:
+        urdf_dir: Path = urdf_path.parent.resolve()
+        target_mesh_dir: Path = (mjcf_path.parent / "meshes").resolve()
+        target_mesh_dir.mkdir(parents=True, exist_ok=True)
+        for mesh_name, filename in mesh_assets.items():
+            source_path: Path = (urdf_dir / filename).resolve()
+            target_path: Path = target_mesh_dir / Path(filename).name
+            if source_path != target_path:
+                shutil.copy2(source_path, target_path)
+
+    # Save the updated MJCF file.
+    save_xml(mjcf_path, ET.ElementTree(mjcf_root))
 
 
 def main() -> None:
+    """Parse command-line arguments and execute the URDF to MJCF conversion."""
     parser = argparse.ArgumentParser(description="Convert a URDF file to an MJCF file.")
-    parser.add_argument("urdf_path", type=str, help="The path to the URDF file.")
-    parser.add_argument("--no-collision-mesh", action="store_true", help="Do not include collision meshes.")
-    parser.add_argument("--output", type=str, help="The path to the output MJCF file.")
-    parser.add_argument("--copy-meshes", action="store_true", help="Copy mesh files to the output MJCF directory.")
-    parser.add_argument("--camera-distance", type=float, default=3.0, help="Camera distance from the robot.")
-    parser.add_argument("--camera-height-offset", type=float, default=0.5, help="Camera height offset.")
-    parser.add_argument("--no-frc-limit", action="store_true", help="Do not include force limit for the actuators.")
+
+    parser.add_argument(
+        "urdf_path",
+        type=str,
+        help="The path to the URDF file.",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        help="The path to the output MJCF file.",
+    )
+    parser.add_argument(
+        "--copy-meshes",
+        action="store_true",
+        help="Copy mesh files to the output MJCF directory.",
+    )
+    parser.add_argument(
+        "--metadata",
+        type=str,
+        help="A JSON string containing joint PD parameters.",
+    )
+    parser.add_argument(
+        "--metadata-file",
+        type=str,
+        help="A JSON file containing joint PD parameters.",
+    )
+
     args = parser.parse_args()
+
+    colorlogging.configure()
+
+    # Parse the raw metadata from the command line arguments.
+    raw_metadata: dict | None = None
+    if args.metadata_file is not None and args.metadata is not None:
+        raise ValueError("Cannot specify both --metadata and --metadata-file")
+    elif args.metadata_file is not None:
+        with open(args.metadata_file, "r") as f:
+            raw_metadata = json.load(f)
+    elif args.metadata is not None:
+        raw_metadata = json.loads(args.metadata)
+    metadata: JointParamsMetadata | None = (
+        None if raw_metadata is None else JointParamsMetadata.model_validate(raw_metadata, strict=True)
+    )
 
     convert_urdf_to_mjcf(
         urdf_path=args.urdf_path,
         mjcf_path=args.output,
-        no_collision_mesh=args.no_collision_mesh,
         copy_meshes=args.copy_meshes,
-        camera_distance=args.camera_distance,
-        camera_height_offset=args.camera_height_offset,
-        no_frc_limit=args.no_frc_limit,
+        joint_params_metadata=metadata,
     )
 
 
