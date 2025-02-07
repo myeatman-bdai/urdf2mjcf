@@ -7,20 +7,21 @@ from pathlib import Path
 from typing import Sequence
 
 from urdf2mjcf.model import ImuSensor
+from urdf2mjcf.utils import save_xml
 
 logger = logging.getLogger(__name__)
 
 
 def add_sensors(
     mjcf_path: str | Path,
-    root_link_name: str,
+    root_site_name: str,
     imus: Sequence[ImuSensor] | None = None,
 ) -> None:
     """Add sensors to the MJCF model.
 
     Args:
         mjcf_path: Path to the MJCF file
-        root_link_name: Name of the root link
+        root_site_name: Name of the root site
         imus: List of IMU sensor configurations
     """
     tree = ET.parse(mjcf_path)
@@ -30,14 +31,14 @@ def add_sensors(
     if sensor_elem is None:
         sensor_elem = ET.SubElement(mjcf_root, "sensor")
 
-    def add_base_sensors(link_name: str) -> None:
+    def add_base_sensors(site_name: str) -> None:
         ET.SubElement(
             sensor_elem,
             "framepos",
             attrib={
                 "name": "base_link_pos",
                 "objtype": "site",
-                "objname": link_name,
+                "objname": site_name,
             },
         )
         ET.SubElement(
@@ -46,7 +47,7 @@ def add_sensors(
             attrib={
                 "name": "base_link_quat",
                 "objtype": "site",
-                "objname": link_name,
+                "objname": site_name,
             },
         )
         ET.SubElement(
@@ -55,7 +56,7 @@ def add_sensors(
             attrib={
                 "name": "base_link_vel",
                 "objtype": "site",
-                "objname": link_name,
+                "objname": site_name,
             },
         )
         ET.SubElement(
@@ -64,7 +65,7 @@ def add_sensors(
             attrib={
                 "name": "base_link_ang_vel",
                 "objtype": "site",
-                "objname": link_name,
+                "objname": site_name,
             },
         )
 
@@ -129,12 +130,12 @@ def add_sensors(
             ET.SubElement(sensor_elem, "magnetometer", attrib=mag_attrib)
 
             # Add other sensors
-            add_base_sensors(imu.link_name)
+            add_base_sensors(site_name)
     else:
-        add_base_sensors(root_link_name)
+        add_base_sensors(root_site_name)
 
     # Save changes
-    tree.write(mjcf_path, encoding="utf-8", xml_declaration=True)
+    save_xml(mjcf_path, tree)
 
 
 def main() -> None:

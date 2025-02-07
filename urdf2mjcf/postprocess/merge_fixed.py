@@ -5,6 +5,8 @@ import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from urdf2mjcf.utils import save_xml
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +62,7 @@ def remove_fixed_joints(mjcf_path: str | Path) -> None:
         parent_body.remove(child_body)
 
     # Save the modified XML
-    tree.write(mjcf_path, encoding="utf-8", xml_declaration=True)
+    save_xml(mjcf_path, tree)
 
 
 def main() -> None:

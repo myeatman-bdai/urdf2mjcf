@@ -5,6 +5,8 @@ import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from urdf2mjcf.utils import save_xml
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,7 +56,7 @@ def fix_base_joint(mjcf_path: str | Path) -> None:
         robot_body.insert(0, ET.Element("freejoint", attrib={"name": "floating_base"}))
 
     # Save changes
-    tree.write(mjcf_path, encoding="utf-8", xml_declaration=True)
+    save_xml(mjcf_path, tree)
 
 
 def main() -> None:
