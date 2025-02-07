@@ -13,12 +13,10 @@ from typing import Sequence
 import colorlogging
 from pydantic import BaseModel
 
+from urdf2mjcf.postprocess.merge_fixed import remove_fixed_joints
 from urdf2mjcf.utils import save_xml
 
 logger = logging.getLogger(__name__)
-
-ROOT_BODY_NAME = "root"
-ROOT_SITE_NAME = f"{ROOT_BODY_NAME}_site"
 
 
 class JointParam(BaseModel):
@@ -432,6 +430,7 @@ def rpy_to_quat(rpy_str: str) -> str:
 
 def add_sensors(
     mjcf_root: ET.Element,
+    root_link_name: str,
     imus: Sequence[ImuSensor] | None = None,
 ) -> None:
     """Add sensors to the MJCF model.
@@ -444,43 +443,43 @@ def add_sensors(
     if sensor_elem is None:
         sensor_elem = ET.SubElement(mjcf_root, "sensor")
 
-    # Adds sensors for global reference frame values.
-    ET.SubElement(
-        sensor_elem,
-        "framepos",
-        attrib={
-            "name": "base_link_pos",
-            "objtype": "site",
-            "objname": ROOT_SITE_NAME,
-        },
-    )
-    ET.SubElement(
-        sensor_elem,
-        "framequat",
-        attrib={
-            "name": "base_link_quat",
-            "objtype": "site",
-            "objname": ROOT_SITE_NAME,
-        },
-    )
-    ET.SubElement(
-        sensor_elem,
-        "framelinvel",
-        attrib={
-            "name": "base_link_vel",
-            "objtype": "site",
-            "objname": ROOT_SITE_NAME,
-        },
-    )
-    ET.SubElement(
-        sensor_elem,
-        "frameangvel",
-        attrib={
-            "name": "base_link_ang_vel",
-            "objtype": "site",
-            "objname": ROOT_SITE_NAME,
-        },
-    )
+    def add_base_sensors(link_name: str) -> None:
+        ET.SubElement(
+            sensor_elem,
+            "framepos",
+            attrib={
+                "name": "base_link_pos",
+                "objtype": "site",
+                "objname": link_name,
+            },
+        )
+        ET.SubElement(
+            sensor_elem,
+            "framequat",
+            attrib={
+                "name": "base_link_quat",
+                "objtype": "site",
+                "objname": link_name,
+            },
+        )
+        ET.SubElement(
+            sensor_elem,
+            "framelinvel",
+            attrib={
+                "name": "base_link_vel",
+                "objtype": "site",
+                "objname": link_name,
+            },
+        )
+        ET.SubElement(
+            sensor_elem,
+            "frameangvel",
+            attrib={
+                "name": "base_link_ang_vel",
+                "objtype": "site",
+                "objname": link_name,
+            },
+        )
 
     if imus:
         for imu in imus:
@@ -541,6 +540,12 @@ def add_sensors(
             if imu.mag_noise is not None:
                 mag_attrib["noise"] = str(imu.mag_noise)
             ET.SubElement(sensor_elem, "magnetometer", attrib=mag_attrib)
+
+            # Adds other sensors.
+            add_base_sensors(imu.link_name)
+
+    else:
+        add_base_sensors(root_link_name)
 
 
 def convert_urdf_to_mjcf(
@@ -716,7 +721,7 @@ def convert_urdf_to_mjcf(
         link_name: str,
         joint: ET.Element | None = None,
         actuator_joints: list[ParsedJointParams] = actuator_joints,
-    ) -> ET.Element:
+    ) -> ET.Element | None:
         """Recursively build a MJCF body element from a URDF link."""
         link: ET.Element = link_map[link_name]
 
@@ -738,15 +743,18 @@ def convert_urdf_to_mjcf(
         # Add joint element if this is not the root and the joint type is not fixed.
         if joint is not None:
             jtype: str = joint.attrib.get("type", "fixed")
-            if jtype != "fixed":
+
+            if jtype in ("revolute", "continuous", "prismatic"):
                 j_name: str = joint.attrib.get("name", link_name + "_joint")
                 j_attrib: dict[str, str] = {"name": j_name}
+
                 if jtype in ["revolute", "continuous"]:
                     j_attrib["type"] = "hinge"
                 elif jtype == "prismatic":
                     j_attrib["type"] = "slide"
                 else:
-                    j_attrib["type"] = jtype
+                    raise ValueError(f"Unsupported joint type: {jtype}")
+
                 limit = joint.find("limit")
                 if limit is not None:
                     lower_val = limit.attrib.get("lower")
@@ -891,11 +899,29 @@ def convert_urdf_to_mjcf(
         if link_name in parent_map:
             for child_name, child_joint in parent_map[link_name]:
                 child_body = build_body(child_name, child_joint, actuator_joints)
-                body.append(child_body)
+                if child_body is not None:
+                    body.append(child_body)
         return body
 
     # Build the robot body hierarchy starting from the root link.
-    robot_body: ET.Element = build_body(root_link_name, None, actuator_joints)
+    robot_body = build_body(root_link_name, None, actuator_joints)
+    if robot_body is None:
+        raise ValueError("Failed to build robot body")
+
+    # Adds free joint to the root link.
+    ET.SubElement(
+        robot_body,
+        "joint",
+        attrib={"name": "floating_base", "type": "free"},
+    )
+
+    # Adds a site to the root link.
+    root_site_name = f"{root_link_name}_site"
+    ET.SubElement(
+        robot_body,
+        "site",
+        attrib={"name": root_site_name, "pos": "0 0 0", "quat": "1 0 0 0"},
+    )
 
     # Automatically compute the base offset using the model's minimum z coordinate.
     identity: list[list[float]] = [
@@ -908,12 +934,13 @@ def convert_urdf_to_mjcf(
     computed_offset: float = -min_z
     logger.info("Auto-detected base offset: %s (min z = %s)", computed_offset, min_z)
 
-    # Create a root body with a freejoint and an IMU site; the z position uses the computed offset.
-    root_body = ET.Element("body", attrib={"name": ROOT_BODY_NAME, "pos": f"0 0 {computed_offset}", "quat": "1 0 0 0"})
-    ET.SubElement(root_body, "freejoint", attrib={"name": ROOT_BODY_NAME})
-    ET.SubElement(root_body, "site", attrib={"name": ROOT_SITE_NAME, "pos": "0 0 0", "quat": "1 0 0 0"})
-    root_body.append(robot_body)
-    worldbody.append(root_body)
+    # Moves the robot body to the computed offset.
+    body_pos = robot_body.attrib.get("pos", "0 0 0")
+    body_pos = [float(x) for x in body_pos.split()]
+    body_pos[2] += computed_offset
+    robot_body.attrib["pos"] = " ".join(f"{x:.8f}" for x in body_pos)
+
+    worldbody.append(robot_body)
 
     # Replace the actuator block with one that uses positional control.
     actuator_elem = ET.SubElement(mjcf_root, "actuator")
@@ -947,7 +974,7 @@ def convert_urdf_to_mjcf(
     add_worldbody_elements(mjcf_root)
 
     # Add sensors after adding worldbody elements
-    add_sensors(mjcf_root, imus=metadata.imus)
+    add_sensors(mjcf_root, root_site_name, imus=metadata.imus)
 
     # Add mesh assets to the asset section.
     asset_elem: ET.Element | None = mjcf_root.find("asset")
@@ -1000,6 +1027,11 @@ def main() -> None:
         type=str,
         help="A JSON file containing conversion metadata (joint params and sensors).",
     )
+    parser.add_argument(
+        "--merge-fixed",
+        action="store_true",
+        help="Merge fixed joints into their parent body.",
+    )
 
     args = parser.parse_args()
 
@@ -1029,6 +1061,9 @@ def main() -> None:
         copy_meshes=args.copy_meshes,
         metadata=metadata,
     )
+
+    if args.merge_fixed:
+        remove_fixed_joints(args.output)
 
 
 if __name__ == "__main__":
