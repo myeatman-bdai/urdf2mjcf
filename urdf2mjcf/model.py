@@ -23,12 +23,12 @@ class ImuSensor(BaseModel):
     """Configuration for an IMU sensor.
 
     Attributes:
-        link_name: Name of the link to attach the IMU to
-        pos: Position relative to link frame, in the form [x, y, z]
-        quat: Quaternion relative to link frame, in the form [w, x, y, z]
+        site_name: Name of the site to attach the IMU to
+        pos: Position relative to site frame, in the form [x, y, z]
+        quat: Quaternion relative to site frame, in the form [w, x, y, z]
     """
 
-    link_name: str
+    site_name: str
     pos: list[float] = [0.0, 0.0, 0.0]
     quat: list[float] = [1.0, 0.0, 0.0, 0.0]
     acc_noise: float | None = None
@@ -41,12 +41,16 @@ class ConversionMetadata(BaseModel):
 
     Attributes:
         joint_params: Optional PD gains metadata for joints
-        cameras: Optional list of camera sensor configurations
         imus: Optional list of IMU sensor configurations
+        remove_fixed_joints: If True, convert fixed child bodies into sites on
+            their parent bodies
+        floating_base: If True, add a floating base to the MJCF model
     """
 
     joint_params: JointParamsMetadata | None = None
     imus: list[ImuSensor] = []
+    remove_fixed_joints: bool = False
+    floating_base: bool = True
 
     class Config:
         extra = "forbid"

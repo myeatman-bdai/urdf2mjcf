@@ -49,11 +49,15 @@ def fix_base_joint(mjcf_path: str | Path) -> None:
         robot_body.attrib["pos"] = "0 0 0"  # Reset position relative to new root
         robot_body.attrib["quat"] = "1 0 0 0"  # Reset orientation relative to new root
         new_root.append(robot_body)
-        worldbody.append(new_root)
+        worldbody.insert(0, new_root)
 
     else:
         logger.warning("Robot body does not have a joint; adding a freejoint")
         robot_body.insert(0, ET.Element("freejoint", attrib={"name": "floating_base"}))
+
+    # Removes the base inertial element.
+    if (base_inertial := robot_body.find("inertial")) is not None:
+        robot_body.remove(base_inertial)
 
     # Save changes
     save_xml(mjcf_path, tree)
