@@ -252,10 +252,10 @@ def add_default(root: ET.Element) -> None:
         attrib={
             "condim": "6",
             # "contype": "1",
-            "conaffinity": "15",
+            # "conaffinity": "15",
             "friction": "0.8 0.02 0.01",
             # "solref": "0.001 2",
-            "solimp": "0.015 1 0.036",
+            # "solimp": "0.015 1 0.036",
             "group": "3",
         },
     )
