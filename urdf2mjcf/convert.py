@@ -185,7 +185,6 @@ def add_compiler(root: ET.Element) -> None:
     """
     attrib = {
         "angle": "radian",
-        "meshdir": "meshes",
         # "eulerseq": "zyx",
         # "autolimits": "true",
     }
@@ -799,7 +798,7 @@ def convert_urdf_to_mjcf(
     if asset_elem is None:
         asset_elem = ET.SubElement(mjcf_root, "asset")
     for mesh_name, filename in mesh_assets.items():
-        ET.SubElement(asset_elem, "mesh", attrib={"name": mesh_name, "file": Path(filename).name})
+        ET.SubElement(asset_elem, "mesh", attrib={"name": mesh_name, "file": filename})
 
     add_contact(mjcf_root, robot)
 
