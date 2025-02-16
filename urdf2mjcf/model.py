@@ -3,6 +3,11 @@
 from pydantic import BaseModel
 
 
+class CollisionParams(BaseModel):
+    friction: list[float] = [0.8, 0.02, 0.01]
+    condim: int = 6
+
+
 class JointParam(BaseModel):
     name: str
     suffixes: list[str]
@@ -10,21 +15,13 @@ class JointParam(BaseModel):
     frictionloss: float | None = None
     actuatorfrc: float | None = None
     kp: float | None = None
-    kd: float | None = None
+    dampratio: float | None = 1.0
 
     class Config:
         extra = "forbid"
 
 
 class ImuSensor(BaseModel):
-    """Configuration for an IMU sensor.
-
-    Attributes:
-        site_name: Name of the site to attach the IMU to
-        pos: Position relative to site frame, in the form [x, y, z]
-        quat: Quaternion relative to site frame, in the form [w, x, y, z]
-    """
-
     site_name: str
     pos: list[float] = [0.0, 0.0, 0.0]
     quat: list[float] = [1.0, 0.0, 0.0, 0.0]
@@ -33,19 +30,27 @@ class ImuSensor(BaseModel):
     mag_noise: float | None = None
 
 
+class CameraSensor(BaseModel):
+    name: str
+    mode: str
+    pos: list[float] = [0.0, 0.0, 0.0]
+    quat: list[float] = [1.0, 0.0, 0.0, 0.0]
+    fovy: float = 45.0
+
+
 class ConversionMetadata(BaseModel):
-    """Configuration for URDF to MJCF conversion.
-
-    Attributes:
-        joint_params: Optional PD gains metadata for joints
-        imus: Optional list of IMU sensor configurations
-        remove_fixed_joints: If True, convert fixed child bodies into sites on
-            their parent bodies
-        floating_base: If True, add a floating base to the MJCF model
-    """
-
+    collision_params: CollisionParams = CollisionParams()
     joint_params: list[JointParam] | None = None
     imus: list[ImuSensor] = []
+    cameras: list[CameraSensor] = [
+        CameraSensor(
+            name="tracking_camera",
+            mode="track",
+            pos=[0, -2.0, 1.0],
+            quat=[0.7071, 0.3827, 0, 0],
+            fovy=90,
+        ),
+    ]
     remove_fixed_joints: bool = False
     remove_redundancies: bool = True
     floating_base: bool = True
