@@ -227,6 +227,9 @@ def add_default(root: ET.Element, metadata: ConversionMetadata) -> None:
             attrib["kp"] = str(joint_param.kp)
         if joint_param.kd is not None:
             attrib["kv"] = str(joint_param.kd)
+        if joint_param.actuatorfrc is not None:
+            attrib["forcelimited"] = "true"
+            attrib["forcerange"] = f"-{joint_param.actuatorfrc} {joint_param.actuatorfrc}"
         ET.SubElement(sub_default, "position", attrib=attrib)
 
     # Visual geometry class
