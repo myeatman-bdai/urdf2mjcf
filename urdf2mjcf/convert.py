@@ -791,7 +791,7 @@ def convert_urdf_to_mjcf(
 
         attrib["class"] = joint_class_name
 
-        ET.SubElement(actuator_elem, "position", attrib={"name": f"{actuator_joint.name}_pos", **attrib})
+        ET.SubElement(actuator_elem, "position", attrib={"name": f"{actuator_joint.name}_ctrl", **attrib})
 
     # Add mesh assets to the asset section before saving
     asset_elem: ET.Element | None = mjcf_root.find("asset")
