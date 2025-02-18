@@ -2,8 +2,6 @@
   "joint_params": [
     {
       "name": "motor",
-      "kp": 10.0,
-      "dampratio": 1.0,
       "armature": 0.001,
       "frictionloss": 0.1,
       "actuatorfrc": 10.0,
@@ -14,7 +12,7 @@
   ],
   "imus": [
     {
-      "site_name": "IMU",
+      "body_name": "IMU",
       "pos": [
         0.0,
         0.0,
@@ -29,6 +27,5 @@
       "acc_noise": 0.001,
       "gyro_noise": 0.01
     }
-  ],
-  "remove_fixed_joints": true
+  ]
 }

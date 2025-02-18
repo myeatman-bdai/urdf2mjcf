@@ -14,15 +14,13 @@ class JointParam(BaseModel):
     armature: float | None = None
     frictionloss: float | None = None
     actuatorfrc: float | None = None
-    kp: float | None = None
-    dampratio: float | None = 1.0
 
     class Config:
         extra = "forbid"
 
 
 class ImuSensor(BaseModel):
-    site_name: str
+    body_name: str
     pos: list[float] = [0.0, 0.0, 0.0]
     quat: list[float] = [1.0, 0.0, 0.0, 0.0]
     acc_noise: float | None = None
@@ -51,7 +49,6 @@ class ConversionMetadata(BaseModel):
             fovy=90,
         ),
     ]
-    remove_fixed_joints: bool = False
     remove_redundancies: bool = True
     floating_base: bool = True
 

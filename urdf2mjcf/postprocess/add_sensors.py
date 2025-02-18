@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 def add_sensors(
     mjcf_path: str | Path,
-    root_site_name: str,
+    root_body_name: str,
     metadata: ConversionMetadata | None = None,
 ) -> None:
     """Add sensors to the MJCF model.
 
     Args:
         mjcf_path: Path to the MJCF file
-        root_site_name: Name of the root site
+        root_body_name: Name of the root body
         metadata: Metadata for the MJCF model
     """
     if metadata is None:
@@ -74,15 +74,21 @@ def add_sensors(
     if metadata.imus:
         for imu in metadata.imus:
             # Find the link to attach the IMU to
-            link_site = mjcf_root.find(f".//site[@name='{imu.site_name}']")
-            if link_site is None:
-                options = [site.attrib["name"] for site in mjcf_root.findall(".//site")]
-                raise ValueError(f"Site {imu.site_name} not found for IMU sensor. Options: {options}")
+            link_body = mjcf_root.find(f".//body[@name='{imu.body_name}']")
+            if link_body is None:
+                options = [body.attrib["name"] for body in mjcf_root.findall(".//body")]
+                raise ValueError(f"Body {imu.body_name} not found for IMU sensor. Options: {options}")
+
+            # Find the site associated with the link.
+            site_elem = link_body.find(".//site")
+            if site_elem is None:
+                site_elem = ET.SubElement(link_body, "site", name=f"{imu.body_name}_site")
+            site_name = site_elem.attrib["name"]
 
             # Add the accelerometer
             acc_attrib = {
-                "name": f"{imu.site_name}_acc",
-                "site": imu.site_name,
+                "name": f"{imu.body_name}_acc",
+                "site": site_name,
             }
             if imu.acc_noise is not None:
                 acc_attrib["noise"] = str(imu.acc_noise)
@@ -90,8 +96,8 @@ def add_sensors(
 
             # Add the gyroscope
             gyro_attrib = {
-                "name": f"{imu.site_name}_gyro",
-                "site": imu.site_name,
+                "name": f"{imu.body_name}_gyro",
+                "site": site_name,
             }
             if imu.gyro_noise is not None:
                 gyro_attrib["noise"] = str(imu.gyro_noise)
@@ -99,18 +105,29 @@ def add_sensors(
 
             # Add the magnetometer
             mag_attrib = {
-                "name": f"{imu.site_name}_mag",
-                "site": imu.site_name,
+                "name": f"{imu.body_name}_mag",
+                "site": site_name,
             }
             if imu.mag_noise is not None:
                 mag_attrib["noise"] = str(imu.mag_noise)
             ET.SubElement(sensor_elem, "magnetometer", attrib=mag_attrib)
 
             # Add other sensors
-            add_base_sensors(imu.site_name)
+            add_base_sensors(site_name)
 
     else:
-        add_base_sensors(root_site_name)
+        # Finds the root body.
+        root_body = mjcf_root.find(f".//body[@name='{root_body_name}']")
+        if root_body is None:
+            raise ValueError(f"Root body {root_body_name} not found in the MJCF model.")
+
+        # Find the site associated with the root body.
+        site_elem = root_body.find(".//site")
+        if site_elem is None:
+            site_elem = ET.SubElement(root_body, "site", name=f"{root_body_name}_site")
+        site_name = site_elem.attrib["name"]
+
+        add_base_sensors(site_name)
 
     # Find the first <body> element to attach the default cameras instead of the root element.
     first_body = mjcf_root.find(".//body")

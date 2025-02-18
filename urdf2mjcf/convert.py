@@ -14,7 +14,6 @@ import colorlogging
 from urdf2mjcf.model import ConversionMetadata, JointParam
 from urdf2mjcf.postprocess.add_sensors import add_sensors
 from urdf2mjcf.postprocess.base_joint import fix_base_joint
-from urdf2mjcf.postprocess.merge_fixed import remove_fixed_joints
 from urdf2mjcf.postprocess.remove_redundancies import remove_redundancies
 from urdf2mjcf.utils import save_xml
 
@@ -205,9 +204,6 @@ def add_default(root: ET.Element, metadata: ConversionMetadata) -> None:
     # Main robot class defaults
     robot_default = ET.SubElement(default, "default", attrib={"class": ROBOT_CLASS})
 
-    # Inherit position.
-    ET.SubElement(robot_default, "position", attrib={"inheritrange": "1"})
-
     for joint_param in joint_params:
         sub_default = ET.SubElement(robot_default, "default", attrib={"class": joint_param.name})
 
@@ -223,14 +219,9 @@ def add_default(root: ET.Element, metadata: ConversionMetadata) -> None:
 
         # Position attributes.
         attrib = {}
-        if joint_param.kp is not None:
-            attrib["kp"] = str(joint_param.kp)
-        if joint_param.dampratio is not None:
-            attrib["dampratio"] = str(joint_param.dampratio)
         if joint_param.actuatorfrc is not None:
-            attrib["forcelimited"] = "true"
-            attrib["forcerange"] = f"-{joint_param.actuatorfrc} {joint_param.actuatorfrc}"
-        ET.SubElement(sub_default, "position", attrib=attrib)
+            attrib["ctrlrange"] = f"-{joint_param.actuatorfrc} {joint_param.actuatorfrc}"
+        ET.SubElement(sub_default, "motor", attrib=attrib)
 
     # Visual geometry class
     visual_default = ET.SubElement(
@@ -791,7 +782,7 @@ def convert_urdf_to_mjcf(
 
         attrib["class"] = joint_class_name
 
-        ET.SubElement(actuator_elem, "position", attrib={"name": f"{actuator_joint.name}_ctrl", **attrib})
+        ET.SubElement(actuator_elem, "motor", attrib={"name": f"{actuator_joint.name}_ctrl", **attrib})
 
     # Add mesh assets to the asset section before saving
     asset_elem: ET.Element | None = mjcf_root.find("asset")
@@ -819,11 +810,9 @@ def convert_urdf_to_mjcf(
     # Apply post-processing steps
     if metadata.floating_base:
         fix_base_joint(mjcf_path)
-    if metadata.remove_fixed_joints:
-        remove_fixed_joints(mjcf_path)
     if metadata.remove_redundancies:
         remove_redundancies(mjcf_path)
-    add_sensors(mjcf_path, root_site_name, metadata=metadata)
+    add_sensors(mjcf_path, root_link_name, metadata=metadata)
 
 
 def main() -> None:
