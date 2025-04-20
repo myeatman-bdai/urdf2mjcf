@@ -23,7 +23,7 @@ def convert_radians_to_degrees(value: str) -> str:
     try:
         nums = [float(x) for x in value.split()]
         degrees = [math.degrees(x) for x in nums]
-        return " ".join(f"{x:.6f}" for x in degrees)
+        return " ".join(f"{x:.6g}" for x in degrees)
     except (ValueError, TypeError):
         return value
 
