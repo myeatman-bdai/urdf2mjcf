@@ -12,6 +12,8 @@ from pathlib import Path
 import colorlogging
 
 from urdf2mjcf.model import ConversionMetadata, JointParam
+from urdf2mjcf.postprocess.add_backlash import add_backlash
+from urdf2mjcf.postprocess.add_floor import add_floor
 from urdf2mjcf.postprocess.add_sensors import add_sensors
 from urdf2mjcf.postprocess.base_joint import fix_base_joint
 from urdf2mjcf.postprocess.explicit_floor_contacts import add_explicit_floor_contacts
@@ -819,14 +821,23 @@ def convert_urdf_to_mjcf(
     if metadata.angle != "radian":
         assert metadata.angle == "degree", "Only 'radian' and 'degree' are supported."
         make_degrees(mjcf_path)
+    if metadata.backlash:
+        add_backlash(mjcf_path, metadata.backlash, metadata.backlash_damping)
     if metadata.floating_base:
         fix_base_joint(mjcf_path, metadata.freejoint)
     if metadata.remove_redundancies:
         remove_redundancies(mjcf_path)
     if (flat_feet_links := metadata.flat_feet_links) is not None:
         make_feet_flat(mjcf_path, flat_feet_links)
-    if (explicit_floor_contacts := metadata.explicit_floor_contacts) is not None:
-        add_explicit_floor_contacts(mjcf_path, explicit_floor_contacts)
+    if metadata.add_floor:
+        add_floor(mjcf_path, floor_name=metadata.floor_name)
+    if (explicit_contacts := metadata.explicit_contacts) is not None:
+        add_explicit_floor_contacts(
+            mjcf_path,
+            contact_links=explicit_contacts.contact_links,
+            class_name=explicit_contacts.class_name,
+            floor_name=metadata.floor_name,
+        )
     add_sensors(mjcf_path, root_link_name, metadata=metadata)
 
 
