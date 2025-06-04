@@ -7,10 +7,19 @@ from pathlib import Path
 
 from scipy.spatial.transform import Rotation as R
 
-from urdf2mjcf.model import ConversionMetadata
+from urdf2mjcf.model import ConversionMetadata, SiteMetadata
 from urdf2mjcf.utils import save_xml
 
 logger = logging.getLogger(__name__)
+
+
+class BodyNotFoundError(ValueError):
+    """Exception raised when a body is not found in the MJCF model."""
+
+    def __init__(self, body_name: str, available_bodies: list[str]) -> None:
+        self.body_name = body_name
+        self.available_bodies = available_bodies
+        super().__init__(f"Body '{body_name}' not found in the MJCF model. Available bodies: {available_bodies}")
 
 
 def add_sensors(
@@ -80,6 +89,31 @@ def add_sensors(
                 "site": site_name,
             },
         )
+
+    def find_site(body_name: str, site_name: str, site_metadata: list[SiteMetadata]) -> ET.Element:
+        # Find the body to attach the site to
+        link_body = mjcf_root.find(f".//body[@name='{body_name}']")
+        if link_body is None:
+            options = [body.attrib["name"] for body in mjcf_root.findall(".//body")]
+            raise BodyNotFoundError(body_name, options)
+
+        # Find or create the site within the body
+        site_elem = link_body.find(f"./site[@name='{site_name}']")
+        if site_elem is None:
+            site_meta = next(
+                (s for s in site_metadata if s.name == site_name), SiteMetadata(body_name=body_name, name=site_name)
+            )
+
+            site_elem = ET.SubElement(link_body, "site", name=site_name)
+            if site_meta.size is not None:
+                site_elem.attrib["size"] = " ".join(str(x) for x in site_meta.size)
+            if site_meta.pos is not None:
+                site_elem.attrib["pos"] = " ".join(str(x) for x in site_meta.pos)
+            if site_meta.site_type is not None:
+                site_elem.attrib["type"] = site_meta.site_type
+            logger.info(f"Created site '{site_name}' on body '{body_name}'.")
+
+        return site_elem
 
     # Finds the root body.
     root_body = mjcf_root.find(f".//body[@name='{root_body_name}']")
@@ -171,21 +205,7 @@ def add_sensors(
 
     # Add force sensors.
     for fs in metadata.force_sensors:
-        # Find the body to attach the site to
-        link_body = mjcf_root.find(f".//body[@name='{fs.body_name}']")
-        if link_body is None:
-            options = [body.attrib["name"] for body in mjcf_root.findall(".//body")]
-            logger.warning(
-                f"Body '{fs.body_name}' not found for force sensor site '{fs.site_name}'. "
-                f"Skipping sensor. Available bodies: {options}"
-            )
-            continue
-
-        # Find or create the site within the body
-        site_elem = link_body.find(f"./site[@name='{fs.site_name}']")
-        if site_elem is None:
-            site_elem = ET.SubElement(link_body, "site", name=fs.site_name)
-            logger.info(f"Created site '{fs.site_name}' on body '{fs.body_name}' for force sensor.")
+        site_elem = find_site(body_name=fs.body_name, site_name=fs.site_name, site_metadata=metadata.sites)
 
         # Add the force sensor element
         fs_name = fs.name if fs.name else f"{fs.site_name}_force"
@@ -197,6 +217,20 @@ def add_sensors(
             fs_attrib["noise"] = str(fs.noise)
 
         ET.SubElement(sensor_elem, "force", attrib=fs_attrib)
+
+    for ts in metadata.touch_sensors:
+        site_elem = find_site(body_name=ts.body_name, site_name=ts.site_name, site_metadata=metadata.sites)
+
+        # Add the touch sensor element
+        ts_name = ts.name if ts.name else f"{ts.site_name}_touch"
+        ts_attrib = {
+            "name": ts_name,
+            "site": ts.site_name,
+        }
+        if ts.noise is not None:
+            ts_attrib["noise"] = str(ts.noise)
+
+        ET.SubElement(sensor_elem, "touch", attrib=ts_attrib)
 
     # Save changes
     save_xml(mjcf_path, tree)
