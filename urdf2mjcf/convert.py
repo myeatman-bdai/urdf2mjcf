@@ -294,15 +294,8 @@ def add_default(
             "priority": str(metadata.collision_params.priority),
             "group": "1",
             "solref": " ".join(f"{x:.6g}" for x in metadata.collision_params.solref),
-            "friction": " ".join(f"{x:.6g}" for x in metadata.collision_params.friction),
-        },
-    )
-    ET.SubElement(
-        collision_default,
-        "equality",
-        attrib={
             "solimp": " ".join(f"{x:.6g}" for x in metadata.collision_params.solimp),
-            "solref": " ".join(f"{x:.6g}" for x in metadata.collision_params.solref),
+            "friction": " ".join(f"{x:.6g}" for x in metadata.collision_params.friction),
         },
     )
 
