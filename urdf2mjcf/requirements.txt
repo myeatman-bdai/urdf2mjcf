@@ -1,6 +1,6 @@
 # requirements.txt
 
-colorlogging
+# colorlogging
 mujoco
 numpy
 pydantic

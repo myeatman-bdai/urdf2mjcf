@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
-import colorlogging
+# import colorlogging
 
 from urdf2mjcf.model import ActuatorMetadata, ConversionMetadata, JointMetadata
 from urdf2mjcf.postprocess.add_backlash import add_backlash
@@ -399,14 +399,11 @@ def add_visual(root: ET.Element) -> None:
     Args:
         root: The MJCF root element.
     """
-    # visual = ET.SubElement(root, "visual")
-    # ET.SubElement(
-    #     visual,
-    #     "global",
-    #     attrib={
-    #         "ellipsoidinertia": "true",
-    #     },
-    # )
+    visual = ET.SubElement(root, "visual")
+    ET.SubElement(
+        visual,
+        "visual"
+    )
 
 
 def add_assets(root: ET.Element, materials: dict[str, str], visualize_collision_meshes: bool = True) -> None:
@@ -584,7 +581,7 @@ def convert_urdf_to_mjcf(
     # Add compiler, assets, and default settings.
     add_compiler(mjcf_root)
     add_option(mjcf_root)
-    add_visual(mjcf_root)
+    # add_visual(mjcf_root)
     add_assets(mjcf_root, materials, metadata.visualize_collision_meshes)
     add_default(mjcf_root, metadata, joint_metadata, actuator_metadata)
 
@@ -987,7 +984,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    colorlogging.configure(level=args.log_level)
+    # colorlogging.configure(level=args.log_level)
 
     # Parse the raw metadata from the command line arguments.
     raw_metadata: dict | None = None
