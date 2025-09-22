@@ -178,6 +178,8 @@ class ConversionMetadata(BaseModel):
     backlash_damping: float = 0.01
     height_offset: float = 0.0
     visualize_collision_meshes: bool = True
+    integrator: str = "Euler"
+    timestep: float = 0.001
 
     class Config:
         extra = "forbid"

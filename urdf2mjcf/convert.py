@@ -382,15 +382,14 @@ def add_option(root: ET.Element) -> None:
     Args:
         root: The MJCF root element.
     """
-    # ET.SubElement(
-    #     root,
-    #     "option",
-    #     attrib={
-    #         "integrator": "implicitfast",
-    #         "cone": "elliptic",
-    #         "impratio": "100",
-    #     },
-    # )
+    ET.SubElement(
+        root,
+        "option",
+        attrib={
+            "integrator": "RK4",
+            "timestep": "0.001",
+        },
+    )
 
 
 def add_visual(root: ET.Element) -> None:
@@ -497,7 +496,7 @@ def _get_empty_joint_and_actuator_metadata(
 
 
 def convert_urdf_to_mjcf(
-    urdf_path: str | Path,
+    urdf_path: str | Path | None = None,
     mjcf_path: str | Path | None = None,
     copy_meshes: bool = False,
     metadata: ConversionMetadata | None = None,
@@ -505,6 +504,7 @@ def convert_urdf_to_mjcf(
     *,
     joint_metadata: dict[str, JointMetadata] | None = None,
     actuator_metadata: dict[str, ActuatorMetadata] | None = None,
+    urdf_string: str | None = None
 ) -> None:
     """Converts a URDF file to an MJCF file.
 
@@ -516,15 +516,22 @@ def convert_urdf_to_mjcf(
         metadata_file: Optional path to metadata file.
         joint_metadata: Optional joint metadata.
         actuator_metadata: Optional actuator metadata.
-    """
-    urdf_path = Path(urdf_path)
-    mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".mjcf")
-    if not urdf_path.exists():
-        raise FileNotFoundError(f"URDF file not found: {urdf_path}")
-    mjcf_path.parent.mkdir(parents=True, exist_ok=True)
+    """ 
 
-    urdf_tree = ET.parse(urdf_path)
-    robot = urdf_tree.getroot()
+    if urdf_string is None: 
+        urdf_path = Path(urdf_path)
+        if not urdf_path.exists():
+            raise FileNotFoundError(f"URDF file not found: {urdf_path}")
+        
+    mjcf_path = Path(mjcf_path) if mjcf_path is not None else urdf_path.with_suffix(".mjcf")
+    mjcf_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    if urdf_string is None: 
+        urdf_tree = ET.parse(urdf_path)
+        robot = urdf_tree.getroot()
+    else:
+        robot = ET.fromstring(urdf_string)
+    
     if robot is None:
         raise ValueError("URDF file has no root element")
 
