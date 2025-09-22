@@ -902,7 +902,7 @@ def convert_urdf_to_mjcf(
     if asset_elem is None:
         asset_elem = ET.SubElement(mjcf_root, "asset")
     for mesh_name, filename in mesh_assets.items():
-        ET.SubElement(asset_elem, "mesh", attrib={"name": mesh_name, "file": filename})
+        ET.SubElement(asset_elem, "mesh", attrib={"name": mesh_name, "file": filename.removeprefix("file://")})
 
     add_contact(mjcf_root, robot)
 
@@ -929,8 +929,9 @@ def convert_urdf_to_mjcf(
         make_degrees(mjcf_path)
     if metadata.backlash:
         add_backlash(mjcf_path, metadata.backlash, metadata.backlash_damping)
-    if metadata.floating_base:
-        fix_base_joint(mjcf_path, metadata.freejoint)
+    fix_base_joint(mjcf_path, add_freejoint=False)
+    # if metadata.floating_base:
+    #     fix_base_joint(mjcf_path, metadata.freejoint)
     if metadata.remove_redundancies:
         remove_redundancies(mjcf_path)
     if (collision_geometries := metadata.collision_geometries) is not None:
