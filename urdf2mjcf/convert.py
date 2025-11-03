@@ -763,7 +763,7 @@ def convert_urdf_to_mjcf(
             if origin_inertial is not None:
                 inertial_elem.attrib["pos"] = origin_inertial.attrib.get("xyz", "0 0 0")
                 rpy = origin_inertial.attrib.get("rpy", "0 0 0")
-                inertial_elem.attrib["quat"] = rpy_to_quat(rpy)
+                # inertial_elem.attrib["quat"] = rpy_to_quat(rpy)
             mass_elem = inertial.find("mass")
             if mass_elem is not None:
                 inertial_elem.attrib["mass"] = mass_elem.attrib.get("value", "0")
