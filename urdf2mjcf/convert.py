@@ -902,7 +902,7 @@ def convert_urdf_to_mjcf(
         attrib["class"] = str(actuator_type_value)
         logger.info(f"Creating actuator {actuator_joint.name}_ctrl with class: {actuator_type_value}")
 
-        ET.SubElement(actuator_elem, "motor", attrib={"name": f"{actuator_joint.name}_ctrl", **attrib})
+        ET.SubElement(actuator_elem, "motor", attrib={"name": f"{actuator_joint.name}", **attrib})
 
     # Add mesh assets to the asset section before saving
     asset_elem: ET.Element | None = mjcf_root.find("asset")
