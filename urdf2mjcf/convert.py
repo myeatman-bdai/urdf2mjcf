@@ -775,12 +775,7 @@ def convert_urdf_to_mjcf(
                 iyy = float(inertia_elem.attrib.get("iyy", "0"))
                 iyz = float(inertia_elem.attrib.get("iyz", "0"))
                 izz = float(inertia_elem.attrib.get("izz", "0"))
-                if abs(ixy) > 1e-6 or abs(ixz) > 1e-6 or abs(iyz) > 1e-6:
-                    logger.warning(
-                        "Warning: off-diagonal inertia terms for link '%s' are nonzero and will be ignored.",
-                        link_name,
-                    )
-                inertial_elem.attrib["diaginertia"] = f"{ixx} {iyy} {izz}"
+                inertial_elem.attrib["fullinertia"] = f"{ixx} {iyy} {izz} {ixy} {ixz} {iyz}"
             body.append(inertial_elem)
 
         # Process collision geometries.
