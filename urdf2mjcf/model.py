@@ -11,7 +11,7 @@ SiteType = Literal["sphere", "capsule", "ellipsoid", "cylinder", "box"]
 
 class CollisionParams(BaseModel):
     condim: int = 3
-    contype: int = 0
+    contype: int = 1
     conaffinity: int = 1
     priority: int = 1
     solimp: list[float] = [0.99, 0.999, 0.00001]
